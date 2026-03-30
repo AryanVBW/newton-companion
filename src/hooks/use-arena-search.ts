@@ -1,0 +1,47 @@
+import { useState, useEffect } from 'react'
+import { invoke } from '@/lib/tauri'
+import { parseToolText, mapArenaProblem } from '@/lib/newton-parsers'
+import type { ArenaProblem } from '@/types/newton'
+
+export interface ArenaFilters {
+  query?: string
+  difficulty?: string | null
+  topics?: string | null
+  companies?: string | null
+}
+
+export function useArenaSearch(filters: ArenaFilters) {
+  const [problems, setProblems] = useState<ArenaProblem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [hasMore, setHasMore] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const result = await invoke<unknown>('mcp_call_tool', {
+          serverId: 'newton-school',
+          toolName: 'search_practice_questions',
+          arguments: {
+            ...(filters.topics ? { topics: filters.topics } : {}),
+            ...(filters.difficulty ? { difficulty: filters.difficulty } : {}),
+            ...(filters.companies ? { companies: filters.companies } : {}),
+            limit: 20,
+          },
+        })
+        const data = parseToolText(result) as any
+        const questions = data?.questions ?? []
+        setProblems(questions.map(mapArenaProblem))
+        setHasMore(data?.has_more ?? false)
+      } catch {
+        setProblems([])
+      } finally {
+        setLoading(false)
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [filters.difficulty, filters.topics, filters.companies])
+
+  return { problems, loading, hasMore }
+}

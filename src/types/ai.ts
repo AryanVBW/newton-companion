@@ -38,3 +38,15 @@ export interface ChatConversation {
   created_at: string
   updated_at: string
 }
+
+// Shape passed to/from the Rust ai_chat command for conversation history
+export interface BackendChatMessage {
+  role: string
+  content?: string | null
+  tool_calls?: Array<{
+    id: string
+    type?: string
+    function: { name: string; arguments: string }
+  }> | null
+  tool_call_id?: string | null
+}

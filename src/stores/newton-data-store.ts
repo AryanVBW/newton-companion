@@ -1,6 +1,15 @@
 import { create } from 'zustand'
 import { invoke } from '@/lib/tauri'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import {
+  parseToolText,
+  mapCourseOverview,
+  parseSchedule,
+  parseLectures,
+  parseAssignments,
+  parseLeaderboard,
+  mapQotd,
+} from '@/lib/newton-parsers'
 
 export interface SyncProgress {
   step: string
@@ -26,17 +35,32 @@ interface NewtonDataStore {
 }
 
 function mapDataFields(raw: Record<string, any>) {
+  const overviewRaw = raw.get_course_overview
+    ? parseToolText(raw.get_course_overview)
+    : null
+  const qotdRaw = raw.get_question_of_the_day
+    ? parseToolText(raw.get_question_of_the_day)
+    : null
+
   return {
-    courses: raw.list_courses ?? null,
-    userProfile: raw.get_me ?? null,
-    courseOverview: raw.get_course_overview ?? null,
-    upcomingSchedule: raw.get_upcoming_schedule ?? null,
-    recentLectures: raw.get_recent_lectures ?? null,
-    assignments: raw.get_assignments ?? null,
-    leaderboard: raw.get_leaderboard ?? null,
-    qotd: raw.get_question_of_the_day ?? null,
-    arenaStats: raw.get_arena_stats ?? null,
-    calendar: raw.get_calendar ?? null,
+    courses: raw.list_courses ? parseToolText(raw.list_courses) : null,
+    userProfile: raw.get_me ? parseToolText(raw.get_me) : null,
+    courseOverview: overviewRaw ? mapCourseOverview(overviewRaw) : null,
+    upcomingSchedule: raw.get_upcoming_schedule
+      ? parseSchedule(raw.get_upcoming_schedule)
+      : [],
+    recentLectures: raw.get_recent_lectures
+      ? parseLectures(raw.get_recent_lectures)
+      : [],
+    assignments: raw.get_assignments
+      ? parseAssignments(raw.get_assignments)
+      : [],
+    leaderboard: raw.get_leaderboard
+      ? parseLeaderboard(raw.get_leaderboard)
+      : [],
+    qotd: qotdRaw ? mapQotd(qotdRaw) : null,
+    arenaStats: raw.get_arena_stats ? parseToolText(raw.get_arena_stats) : null,
+    calendar: raw.get_calendar ? parseToolText(raw.get_calendar) : null,
   }
 }
 
