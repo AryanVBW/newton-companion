@@ -67,6 +67,7 @@ function SettingsPage() {
   const [selectedProvider, setSelectedProvider] = useState('github_copilot')
   const [selectedModel, setSelectedModel] = useState('gpt-4.1')
   const [apiKey, setApiKey] = useState('')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [googleConnected, setGoogleConnected] = useState(false)
   const [syncLectures, setSyncLectures] = useState(true)
   const [syncContests, setSyncContests] = useState(true)
@@ -315,16 +316,28 @@ function SettingsPage() {
                 <Button
                   size="sm"
                   className="w-full"
-                  onClick={() =>
-                    invoke('ai_configure', {
-                      provider: selectedProvider,
-                      baseUrl: '',
-                      apiKey,
-                      modelId: selectedModel,
-                    })
-                  }
+                  disabled={!apiKey.trim() || saveStatus === 'saving'}
+                  onClick={async () => {
+                    setSaveStatus('saving')
+                    try {
+                      await invoke('ai_configure', {
+                        provider: selectedProvider,
+                        baseUrl: '',
+                        apiKey: apiKey.trim(),
+                        modelId: selectedModel,
+                      })
+                      setSaveStatus('saved')
+                      setTimeout(() => setSaveStatus('idle'), 3000)
+                    } catch {
+                      setSaveStatus('error')
+                      setTimeout(() => setSaveStatus('idle'), 4000)
+                    }
+                  }}
                 >
-                  Save AI Configuration
+                  {saveStatus === 'saving' && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                  {saveStatus === 'saved' && <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-green-400" />}
+                  {saveStatus === 'error' && <X className="w-3.5 h-3.5 mr-1.5 text-red-400" />}
+                  {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved!' : saveStatus === 'error' ? 'Save failed' : 'Save AI Configuration'}
                 </Button>
               </>
             )}
