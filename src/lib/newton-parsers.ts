@@ -31,6 +31,20 @@ export function parseToolText(data: unknown): unknown {
 }
 
 // ---------------------------------------------------------------------------
+// Safe date coercion — returns a valid Date or a fallback to avoid crashes
+// ---------------------------------------------------------------------------
+function coerceDate(value: unknown, fallback = new Date()): Date {
+  if (value === null || value === undefined) return fallback
+  const d = typeof value === 'number' ? new Date(value) : new Date(value as string)
+  return Number.isNaN(d.getTime()) ? fallback : d
+}
+
+function formatLocaleTime(value: unknown): string {
+  const d = coerceDate(value)
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+// ---------------------------------------------------------------------------
 // Course overview
 // Real shape: { course_title, performance: { lectures_attended, total_lectures,
 //   completed_assignment_questions, total_assignment_questions },
@@ -99,7 +113,7 @@ export function parseSchedule(data: unknown): ScheduleItem[] {
 //   start_timestamp(ISO), end_timestamp(ISO), url }], returned_count }
 // ---------------------------------------------------------------------------
 export function mapLecture(raw: any): Lecture {
-  const start = new Date(raw.start_timestamp)
+  const start = coerceDate(raw.start_timestamp)
   const now = new Date()
   let status: LectureStatus = 'upcoming'
   if (raw.is_attended || raw.attended) status = 'attended'
@@ -114,8 +128,9 @@ export function mapLecture(raw: any): Lecture {
     subject_hash: raw.subject_hash,
     instructor: raw.instructor ?? raw.instructor_user?.name ?? '',
     date: start.toISOString().split('T')[0],
-    start_time: start.toISOString(),
-    end_time: raw.end_timestamp ?? '',
+    // Format as locale time for direct UI rendering (e.g. "5:00 PM")
+    start_time: formatLocaleTime(raw.start_timestamp),
+    end_time: formatLocaleTime(raw.end_timestamp),
     status,
     recording_url: raw.url,
     description: raw.description ?? '',
@@ -137,11 +152,7 @@ export function parseLectures(data: unknown): Lecture[] {
 //   end_timestamp(unix ms), total_questions, url }], contests: [...] }
 // ---------------------------------------------------------------------------
 export function mapAssignment(raw: any): Assignment {
-  // end_timestamp can be unix ms (number) or ISO string
-  const dueDate =
-    typeof raw.end_timestamp === 'number'
-      ? new Date(raw.end_timestamp)
-      : new Date(raw.end_timestamp ?? raw.due_date ?? Date.now())
+  const dueDate = coerceDate(raw.end_timestamp ?? raw.due_date)
   const now = new Date()
   const derivedStatus: AssignmentStatus = dueDate < now ? 'overdue' : 'pending'
 
@@ -207,10 +218,15 @@ export function mapQotd(raw: any): QOTD {
 //   tags, is_solved, acceptance_rate, url }], total_count, has_more }
 // ---------------------------------------------------------------------------
 export function mapArenaProblem(raw: any): ArenaProblem {
+  const difficulty: Difficulty =
+    typeof raw.difficulty === 'string'
+      ? (raw.difficulty.toLowerCase() as Difficulty)
+      : 'medium'
+
   return {
     id: raw.hash ?? raw.id ?? '',
     title: raw.title ?? '',
-    difficulty: ((raw.difficulty ?? 'medium') as string).toLowerCase() as Difficulty,
+    difficulty,
     category: raw.topic ?? raw.category ?? '',
     tags: raw.tags ?? [],
     solved: raw.is_solved ?? raw.solved ?? false,

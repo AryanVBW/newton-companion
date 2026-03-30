@@ -32,6 +32,7 @@ function ArenaPage() {
   const [showSolved, setShowSolved] = useState(true)
 
   const { problems, loading: searchLoading } = useArenaSearch({
+    query: search || undefined,
     difficulty: difficulty ?? undefined,
     topics: category ?? undefined,
   })
@@ -44,13 +45,11 @@ function ArenaPage() {
     [problems]
   )
 
-  const filtered = useMemo(() => {
-    return problems.filter((p) => {
-      if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false
-      if (!showSolved && p.solved) return false
-      return true
-    })
-  }, [problems, search, showSolved])
+  // Server handles query/difficulty/topics filtering; client-side only for showSolved
+  const filtered = useMemo(
+    () => (showSolved ? problems : problems.filter((p) => !p.solved)),
+    [problems, showSolved]
+  )
 
   if (dataLoading) return <ArenaSkeleton />
 

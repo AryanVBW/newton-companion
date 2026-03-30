@@ -53,6 +53,7 @@ function ChatPage() {
     setIsTyping(true)
 
     try {
+      const prevLength = history.length
       const result = await invoke<{ response: string; messages: BackendChatMessage[] }>(
         'ai_chat',
         { message: text.trim(), history }
@@ -60,12 +61,13 @@ function ChatPage() {
 
       setHistory(result.messages)
 
-      // Extract tool calls made by the assistant during this turn
-      const toolCalls: ChatToolCall[] = result.messages
+      // Extract tool calls only from messages added in THIS turn (after prevLength + 1 for the user msg)
+      const newMessages = result.messages.slice(prevLength + 1)
+      const toolCalls: ChatToolCall[] = newMessages
         .filter((m) => m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0)
         .flatMap((m) =>
           (m.tool_calls ?? []).map((tc) => {
-            const toolResult = result.messages.find(
+            const toolResult = newMessages.find(
               (r) => r.role === 'tool' && r.tool_call_id === tc.id
             )
             let parsedArgs: Record<string, unknown> = {}
