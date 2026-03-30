@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Sun, Moon, Monitor, Brain, Bell, Calendar, Info,
@@ -17,6 +17,7 @@ import { useUiStore } from '@/stores/ui-store'
 import { useNewtonAuthStore } from '@/stores/newton-auth-store'
 import { AI_PROVIDERS } from '@/lib/constants'
 import { cn } from '@/lib/cn'
+import { invoke } from '@/lib/tauri'
 
 function GitHubIcon({ className }: { className?: string }) {
   return (
@@ -66,6 +67,7 @@ function SettingsPage() {
   const [selectedProvider, setSelectedProvider] = useState('github_copilot')
   const [selectedModel, setSelectedModel] = useState('gpt-4.1')
   const [apiKey, setApiKey] = useState('')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [googleConnected, setGoogleConnected] = useState(false)
   const [syncLectures, setSyncLectures] = useState(true)
   const [syncContests, setSyncContests] = useState(true)
@@ -77,6 +79,14 @@ function SettingsPage() {
   const [notifyQotd, setNotifyQotd] = useState(true)
   const [googleClientId, setGoogleClientId] = useState('')
   const [googleClientSecret, setGoogleClientSecret] = useState('')
+
+  useEffect(() => {
+    invoke<any>('ai_get_config').then((config) => {
+      if (config?.provider) setSelectedProvider(config.provider)
+      if (config?.model_id) setSelectedModel(config.model_id)
+      // never pre-fill apiKey for security
+    }).catch(() => {})
+  }, [])
 
   const provider = AI_PROVIDERS.find((p) => p.id === selectedProvider)
   const providerModels = provider?.models ?? []
@@ -303,7 +313,32 @@ function SettingsPage() {
                     onChange={(e) => setApiKey(e.target.value)}
                   />
                 </div>
-                <Button size="sm" className="w-full">Save AI Configuration</Button>
+                <Button
+                  size="sm"
+                  className="w-full"
+                  disabled={!apiKey.trim() || saveStatus === 'saving'}
+                  onClick={async () => {
+                    setSaveStatus('saving')
+                    try {
+                      await invoke('ai_configure', {
+                        provider: selectedProvider,
+                        baseUrl: '',
+                        apiKey: apiKey.trim(),
+                        modelId: selectedModel,
+                      })
+                      setSaveStatus('saved')
+                      setTimeout(() => setSaveStatus('idle'), 3000)
+                    } catch {
+                      setSaveStatus('error')
+                      setTimeout(() => setSaveStatus('idle'), 4000)
+                    }
+                  }}
+                >
+                  {saveStatus === 'saving' && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+                  {saveStatus === 'saved' && <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-green-400" />}
+                  {saveStatus === 'error' && <X className="w-3.5 h-3.5 mr-1.5 text-red-400" />}
+                  {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved!' : saveStatus === 'error' ? 'Save failed' : 'Save AI Configuration'}
+                </Button>
               </>
             )}
           </CardContent>

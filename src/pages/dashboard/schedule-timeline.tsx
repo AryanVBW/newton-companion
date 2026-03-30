@@ -2,18 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Clock, Calendar } from 'lucide-react'
 import { cn } from '@/lib/cn'
-
-interface ScheduleEvent {
-  id: string
-  title: string
-  type: string
-  subject_name?: string
-  start_time?: string
-  end_time?: string
-}
+import type { ScheduleItem } from '@/types/newton'
 
 interface ScheduleTimelineProps {
-  events?: ScheduleEvent[] | null
+  events?: ScheduleItem[] | null
 }
 
 const typeColors: Record<string, string> = {
@@ -65,13 +57,13 @@ function ScheduleTimeline({ events }: ScheduleTimelineProps) {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm font-medium leading-tight">{item.title}</p>
-                      {item.subject_name && (
-                        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">{item.subject_name}</p>
+                      {item.subject && (
+                        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">{item.subject}</p>
                       )}
                     </div>
-                    {item.start_time && (
+                    {item.time && (
                       <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">
-                        {formatTime(item.start_time)}
+                        {formatTime(item.time)}
                       </span>
                     )}
                   </div>

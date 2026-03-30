@@ -41,6 +41,7 @@ export interface Lecture {
   id: string
   title: string
   subject: string
+  subject_hash?: string
   instructor: string
   date: string
   start_time: string
@@ -49,6 +50,7 @@ export interface Lecture {
   recording_url?: string
   description?: string
   topics: string[]
+  url?: string
 }
 
 export type LectureStatus = 'attended' | 'missed' | 'upcoming' | 'recording'
@@ -63,6 +65,7 @@ export interface Assignment {
   max_score: number
   description: string
   difficulty: Difficulty
+  url?: string
 }
 
 export type AssignmentStatus = 'pending' | 'submitted' | 'graded' | 'overdue'
@@ -76,6 +79,7 @@ export interface ArenaProblem {
   solved: boolean
   acceptance_rate: number
   description: string
+  url?: string
 }
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
@@ -93,9 +97,11 @@ export interface ScheduleItem {
   id: string
   title: string
   time: string
+  end_time?: string
   type: 'lecture' | 'assignment' | 'event'
   subject?: string
   status?: string
+  url?: string
 }
 
 export interface QOTD {

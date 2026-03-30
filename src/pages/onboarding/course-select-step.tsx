@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { GraduationCap, BookOpen, ChevronRight, Loader2, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { invoke } from '@/lib/tauri'
+import { parseToolText } from '@/lib/newton-parsers'
 
 interface CourseOption {
   course_hash: string
@@ -15,17 +16,6 @@ interface CourseOption {
 interface CourseSelectStepProps {
   onNext: (courseHash: string, courseName: string, semesterName: string | null) => void
   onBack: () => void
-}
-
-function parseToolText(data: any): any {
-  try {
-    if (!data) return null
-    const text = data?.content?.[0]?.text
-    if (text) return JSON.parse(text)
-    return data
-  } catch {
-    return data
-  }
 }
 
 function CourseSelectStep({ onNext, onBack }: CourseSelectStepProps) {
@@ -45,7 +35,7 @@ function CourseSelectStep({ onNext, onBack }: CourseSelectStepProps) {
           toolName: 'list_courses',
           args: {},
         })
-        const parsed = parseToolText(result)
+        const parsed = parseToolText(result) as any
         const courseList: CourseOption[] = parsed?.courses || []
         setCourses(courseList)
         // Auto-select primary course

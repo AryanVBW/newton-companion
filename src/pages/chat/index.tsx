@@ -6,13 +6,14 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MessageBubble } from './message-bubble'
 import { ToolCallCard } from './tool-call-card'
-import type { ChatMessage, ChatToolCall } from '@/types/ai'
+import { invoke } from '@/lib/tauri'
+import type { ChatMessage, ChatToolCall, BackendChatMessage } from '@/types/ai'
 
 const SUGGESTIONS = [
   'How am I doing?',
   'What did I miss?',
   'Practice problems for DSA',
-  'Summarize today\'s lectures',
+  "Summarize today's lectures",
 ]
 
 const INITIAL_MESSAGES: ChatMessage[] = [
@@ -20,13 +21,14 @@ const INITIAL_MESSAGES: ChatMessage[] = [
     id: '1',
     role: 'assistant',
     content:
-      'Hi Vivek! I\'m your Newton Companion AI. I can help you track your progress, catch up on missed lectures, find practice problems, and more. What would you like to know?',
+      "Hi! I'm your Newton Companion AI. I can help you track your progress, catch up on missed lectures, find practice problems, and more. What would you like to know?",
     timestamp: new Date(Date.now() - 60000).toISOString(),
   },
 ]
 
 function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES)
+  const [history, setHistory] = useState<BackendChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -38,7 +40,7 @@ function ChatPage() {
   }, [messages, isTyping])
 
   const sendMessage = async (text: string) => {
-    if (!text.trim()) return
+    if (!text.trim() || isTyping) return
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -50,31 +52,63 @@ function ChatPage() {
     setInput('')
     setIsTyping(true)
 
-    // Simulate tool call + response
-    await new Promise((r) => setTimeout(r, 800))
+    try {
+      const prevLength = history.length
+      const result = await invoke<{ response: string; messages: BackendChatMessage[] }>(
+        'ai_chat',
+        { message: text.trim(), history }
+      )
 
-    const toolCall: ChatToolCall = {
-      id: crypto.randomUUID(),
-      tool_name: 'get_course_overview',
-      server_name: 'Newton School',
-      arguments: {},
-      result: JSON.stringify({ rank: 23, total_xp: 12450, level: 8 }),
-      is_loading: false,
-      is_error: false,
+      setHistory(result.messages)
+
+      // Extract tool calls only from messages added in THIS turn (after prevLength + 1 for the user msg)
+      const newMessages = result.messages.slice(prevLength + 1)
+      const toolCalls: ChatToolCall[] = newMessages
+        .filter((m) => m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0)
+        .flatMap((m) =>
+          (m.tool_calls ?? []).map((tc) => {
+            const toolResult = newMessages.find(
+              (r) => r.role === 'tool' && r.tool_call_id === tc.id
+            )
+            let parsedArgs: Record<string, unknown> = {}
+            try { parsedArgs = JSON.parse(tc.function.arguments ?? '{}') } catch {}
+            return {
+              id: tc.id,
+              tool_name: tc.function.name,
+              server_name: 'Newton School',
+              arguments: parsedArgs,
+              result: typeof toolResult?.content === 'string' ? toolResult.content : '',
+              is_loading: false,
+              is_error: false,
+            }
+          })
+        )
+
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: result.response,
+        timestamp: new Date().toISOString(),
+        tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+      }
+      setMessages((prev) => [...prev, aiMsg])
+    } catch (err: any) {
+      const errText =
+        String(err).includes('not configured') || String(err).includes('API key')
+          ? 'AI is not configured yet. Go to Settings → AI Brain to add your API key.'
+          : `Error: ${String(err)}`
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: errText,
+          timestamp: new Date().toISOString(),
+        },
+      ])
+    } finally {
+      setIsTyping(false)
     }
-
-    await new Promise((r) => setTimeout(r, 1200))
-
-    const aiMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: getAiResponse(text),
-      timestamp: new Date().toISOString(),
-      tool_calls: [toolCall],
-    }
-
-    setMessages((prev) => [...prev, aiMsg])
-    setIsTyping(false)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -151,23 +185,6 @@ function ChatPage() {
       </div>
     </motion.div>
   )
-}
-
-function getAiResponse(input: string): string {
-  const lower = input.toLowerCase()
-  if (lower.includes('doing') || lower.includes('progress')) {
-    return "You're doing great! You're ranked #23 out of 156 students with 12,450 XP at Level 8. Your DSA progress is at 78%, Math at 65%, and AI Foundations at 82%. You've attended 45 out of 52 lectures (87%) and completed 18 out of 22 assignments. Keep up the momentum!"
-  }
-  if (lower.includes('miss') || lower.includes('missed')) {
-    return "You've missed 2 lectures recently:\n\n1. **Graph Algorithms** (Mar 21) - Covered BFS, DFS, and shortest path algorithms. A recording is available.\n\n2. **Calculus - Integration** (Mar 17) - Covered definite integrals and integration techniques.\n\nI'd recommend watching the Graph Algorithms recording first since it's a prerequisite for upcoming topics. Want me to create a recovery plan?"
-  }
-  if (lower.includes('practice') || lower.includes('problem')) {
-    return "Based on your current progress, I recommend these practice problems:\n\n1. **LRU Cache** (Medium) - Great for your upcoming design patterns module\n2. **Course Schedule** (Medium) - Builds on the graph algorithms you're learning\n3. **Longest Increasing Subsequence** (Medium) - Good DP practice before your exam\n\nYou've solved 142 problems so far. Want me to filter by a specific topic?"
-  }
-  if (lower.includes('lecture') || lower.includes('today') || lower.includes('summarize')) {
-    return "Here's your schedule for today:\n\n- **9:00 AM** - Data Structures & Algorithms (Binary Search Trees)\n- **11:00 AM** - Mathematics Tutorial\n- **3:00 PM** - Foundations of AI\n\nYour DSA Assignment #5 is also due at 2:00 PM today. Make sure to submit it before the deadline!"
-  }
-  return "I'd be happy to help with that! I can look up your course data, check your assignment status, find practice problems, or help you catch up on missed lectures. What would you like to know more about?"
 }
 
 export { ChatPage }

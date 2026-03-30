@@ -11,21 +11,6 @@ import { RefreshCw, WifiOff, Link2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useUiStore } from '@/stores/ui-store'
 
-// Parse MCP tool response — handles both raw MCP envelope and pre-parsed data
-function parseToolText(data: any): any {
-  try {
-    if (!data) return null
-    // If it's already a plain object (from cache), return as-is
-    if (typeof data === 'object' && !data?.content?.[0]?.text) return data
-    // MCP envelope: { content: [{ text: "..." }] }
-    const text = data?.content?.[0]?.text
-    if (text) return JSON.parse(text)
-    return data
-  } catch {
-    return data
-  }
-}
-
 function DashboardSkeleton() {
   return (
     <div className="p-6 space-y-6">
@@ -77,43 +62,21 @@ function DashboardPage() {
 
   if (!connected && !syncing) return <NotConnectedState />
 
-  const overview = parseToolText(courseOverview)
-  const user = parseToolText(userProfile)
-  const scheduleData = parseToolText(upcomingSchedule)
-  const leaderboardData = parseToolText(leaderboard)
-  const qotdData = parseToolText(qotd)
-  const arenaData = parseToolText(arenaStats)
+  const user = userProfile as any
   const userName = user?.name || 'Student'
 
   const hour = new Date().getHours()
   const greeting =
     hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
-  const courseData = overview
-    ? {
-        course_name: overview.course_name || '',
-        semester_name: overview.semester_name || '',
-        total_xp: overview.total_xp ?? overview.total_earned_points ?? 0,
-        current_level: overview.current_level ?? 0,
-        rank: overview.rank ?? 0,
-        total_students: overview.total_students ?? 0,
-        lectures_attended: overview.lectures_attended ?? overview.total_lectures_attended ?? 0,
-        total_lectures: overview.total_lectures ?? 0,
-        assignments_completed: overview.assignments_completed ?? overview.total_completed_assignment_questions ?? 0,
-        total_assignments: overview.total_assignments ?? 0,
-        subjects: overview.subjects ?? [],
-      }
-    : null
-
-  // Build stats from real data
   const statsData = {
-    lecturesPercent: courseData && courseData.total_lectures > 0
-      ? Math.round((courseData.lectures_attended / courseData.total_lectures) * 100)
+    lecturesPercent: courseOverview && courseOverview.total_lectures > 0
+      ? Math.round((courseOverview.lectures_attended / courseOverview.total_lectures) * 100)
       : 0,
-    assignmentsDone: courseData?.assignments_completed ?? 0,
-    totalAssignments: courseData?.total_assignments ?? 0,
-    problemsSolved: arenaData?.solved_questions_count ?? 0,
-    rank: courseData?.rank ?? 0,
+    assignmentsDone: courseOverview?.assignments_completed ?? 0,
+    totalAssignments: courseOverview?.total_assignments ?? 0,
+    problemsSolved: (arenaStats as any)?.solved_questions_count ?? 0,
+    rank: courseOverview?.rank ?? 0,
   }
 
   return (
@@ -152,13 +115,13 @@ function DashboardPage() {
       <QuickStats data={statsData} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {courseData && <CourseOverviewCard data={courseData} />}
-        <ScheduleTimeline events={scheduleData?.events} />
+        {courseOverview && <CourseOverviewCard data={courseOverview} />}
+        <ScheduleTimeline events={upcomingSchedule} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <QotdCard data={qotdData} />
-        <LeaderboardWidget data={leaderboardData} />
+        <QotdCard data={qotd} />
+        <LeaderboardWidget data={Array.isArray(leaderboard) ? { leaderboard } : leaderboard as any} />
       </div>
     </motion.div>
   )
