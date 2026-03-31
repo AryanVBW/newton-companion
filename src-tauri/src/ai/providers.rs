@@ -115,10 +115,10 @@ pub struct AiConfig {
 impl Default for AiConfig {
     fn default() -> Self {
         Self {
-            provider: AiProvider::Github,
-            base_url: AiProvider::Github.default_base_url().to_string(),
+            provider: AiProvider::Claude,
+            base_url: AiProvider::Claude.default_base_url().to_string(),
             api_key: String::new(),
-            model_id: "gpt-4o".to_string(),
+            model_id: "claude-haiku-4-5-20251001".to_string(),
             temperature: 0.7,
         }
     }

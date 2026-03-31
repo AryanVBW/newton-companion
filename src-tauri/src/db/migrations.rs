@@ -22,15 +22,15 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
 
         CREATE TABLE IF NOT EXISTS ai_config (
             id         INTEGER PRIMARY KEY CHECK (id = 1),
-            provider   TEXT NOT NULL DEFAULT 'github',
-            base_url   TEXT NOT NULL DEFAULT 'https://models.inference.ai.azure.com',
+            provider   TEXT NOT NULL DEFAULT 'claude',
+            base_url   TEXT NOT NULL DEFAULT 'https://api.anthropic.com/v1',
             api_key    TEXT NOT NULL DEFAULT '',
-            model_id   TEXT NOT NULL DEFAULT 'gpt-4o',
+            model_id   TEXT NOT NULL DEFAULT 'claude-haiku-4-5-20251001',
             temperature REAL NOT NULL DEFAULT 0.7
         );
 
         INSERT OR IGNORE INTO ai_config (id, provider, base_url, api_key, model_id, temperature)
-        VALUES (1, 'github', 'https://models.inference.ai.azure.com', '', 'gpt-4o', 0.7);
+        VALUES (1, 'claude', 'https://api.anthropic.com/v1', '', 'claude-haiku-4-5-20251001', 0.7);
 
         CREATE TABLE IF NOT EXISTS chat_history (
             id               TEXT PRIMARY KEY NOT NULL,
@@ -106,6 +106,53 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
             name          TEXT PRIMARY KEY NOT NULL,
             description   TEXT NOT NULL DEFAULT '',
             input_schema  TEXT NOT NULL DEFAULT '{}'
+        );
+
+        -- ===================================================================
+        -- AI Agent Brain tables
+        -- ===================================================================
+
+        -- Persistent memory for the brain (learned patterns, project knowledge, etc.)
+        CREATE TABLE IF NOT EXISTS brain_memory (
+            id             TEXT PRIMARY KEY NOT NULL,
+            category       TEXT NOT NULL,
+            content        TEXT NOT NULL,
+            context_tags   TEXT NOT NULL DEFAULT '[]',
+            importance     REAL NOT NULL DEFAULT 0.5,
+            created_at     TEXT NOT NULL,
+            last_accessed  TEXT NOT NULL,
+            access_count   INTEGER NOT NULL DEFAULT 0
+        );
+
+        -- Goal history — every goal the brain has ever processed
+        CREATE TABLE IF NOT EXISTS brain_goals (
+            id              TEXT PRIMARY KEY NOT NULL,
+            description     TEXT NOT NULL,
+            context         TEXT,
+            status          TEXT NOT NULL DEFAULT 'planning',
+            plan_json       TEXT,
+            result_summary  TEXT,
+            created_at      TEXT NOT NULL,
+            completed_at    TEXT,
+            total_steps     INTEGER NOT NULL DEFAULT 0,
+            completed_steps INTEGER NOT NULL DEFAULT 0,
+            revision        INTEGER NOT NULL DEFAULT 0
+        );
+
+        -- Execution log — every step ever executed
+        CREATE TABLE IF NOT EXISTS brain_execution_log (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            goal_id        TEXT NOT NULL,
+            step_id        INTEGER NOT NULL,
+            action_type    TEXT NOT NULL,
+            description    TEXT NOT NULL,
+            status         TEXT NOT NULL,
+            output         TEXT,
+            error          TEXT,
+            duration_ms    INTEGER NOT NULL DEFAULT 0,
+            provider_used  TEXT,
+            executed_at    TEXT NOT NULL,
+            FOREIGN KEY (goal_id) REFERENCES brain_goals(id)
         );
         ",
     )?;

@@ -29,7 +29,7 @@ export const AI_PROVIDERS = [
     id: 'claude',
     name: 'Claude (Anthropic)',
     description: 'Anthropic Claude models. Best for reasoning & code.',
-    models: ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001', 'claude-opus-4-20250514'],
+    models: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-20250514', 'claude-opus-4-20250514'],
     keyLabel: 'Anthropic API Key',
     keyHint: 'Get at console.anthropic.com/settings/keys',
     free: false,

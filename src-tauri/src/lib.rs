@@ -29,8 +29,8 @@ fn load_ai_config_from_db(state: &AppState, db_conn: &rusqlite::Connection) {
     );
 
     if let Ok(config) = result {
-        // ai_brain uses tokio::sync::Mutex but we can try_lock since nothing else holds it yet.
-        if let Ok(mut brain) = state.ai_brain.try_lock() {
+        // agent_brain uses tokio::sync::Mutex but we can try_lock since nothing else holds it yet.
+        if let Ok(mut brain) = state.agent_brain.try_lock() {
             brain.configure(config);
         }
     }
@@ -69,11 +69,18 @@ pub fn run() {
             commands::mcp::mcp_list_servers,
             commands::mcp::mcp_add_server,
             commands::mcp::mcp_remove_server,
-            // AI commands
+            // AI commands (chat + config)
             commands::ai::ai_chat,
             commands::ai::ai_configure,
             commands::ai::ai_get_config,
             commands::ai::ai_list_models,
+            // Brain commands (autonomous agent)
+            commands::ai::brain_execute_goal,
+            commands::ai::brain_get_status,
+            commands::ai::brain_cancel_goal,
+            commands::ai::brain_get_history,
+            commands::ai::brain_get_memory,
+            commands::ai::brain_clear_memory,
             // Settings commands
             commands::settings::get_settings,
             commands::settings::save_settings,
