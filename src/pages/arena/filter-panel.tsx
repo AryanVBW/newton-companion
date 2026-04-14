@@ -4,21 +4,23 @@ import { cn } from '@/lib/cn'
 interface FilterPanelProps {
   selectedDifficulty: string | null
   onDifficultyChange: (d: string | null) => void
+  difficulties?: string[]
   selectedCategory: string | null
   onCategoryChange: (c: string | null) => void
   categories: string[]
+  categorySlugs?: string[]
   showSolved: boolean
   onShowSolvedChange: (s: boolean) => void
 }
 
-const difficulties = ['easy', 'medium', 'hard']
-
 function FilterPanel({
   selectedDifficulty,
   onDifficultyChange,
+  difficulties = ['easy', 'medium', 'hard'],
   selectedCategory,
   onCategoryChange,
   categories,
+  categorySlugs,
   showSolved,
   onShowSolvedChange,
 }: FilterPanelProps) {
@@ -51,27 +53,32 @@ function FilterPanel({
         </div>
       </div>
 
-      <div>
-        <h4 className="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-2">
-          Category
-        </h4>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((c) => (
-            <button
-              key={c}
-              onClick={() => onCategoryChange(selectedCategory === c ? null : c)}
-              className="cursor-pointer"
-            >
-              <Badge
-                variant={selectedCategory === c ? 'default' : 'outline'}
-                className="cursor-pointer"
-              >
-                {c}
-              </Badge>
-            </button>
-          ))}
+      {categories.length > 0 && (
+        <div>
+          <h4 className="text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-2">
+            Topic
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c, i) => {
+              const slug = categorySlugs?.[i] ?? c
+              return (
+                <button
+                  key={slug}
+                  onClick={() => onCategoryChange(selectedCategory === slug ? null : slug)}
+                  className="cursor-pointer"
+                >
+                  <Badge
+                    variant={selectedCategory === slug ? 'default' : 'outline'}
+                    className="cursor-pointer"
+                  >
+                    {c}
+                  </Badge>
+                </button>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <div>
         <button

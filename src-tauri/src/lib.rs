@@ -10,6 +10,7 @@ pub mod state;
 use tauri::Manager;
 
 use crate::ai::providers::{AiConfig, AiProvider};
+use crate::commands::integrations;
 use crate::state::AppState;
 
 /// Load the AI configuration from the database and apply it to the AppState.
@@ -55,6 +56,14 @@ pub fn run() {
             {
                 let db_ref = state.db.lock().unwrap();
                 load_ai_config_from_db(&state, &db_ref);
+            }
+
+            // Auto-connect integrations (Notion MCP, Google Calendar tokens)
+            {
+                let state_ref = &state;
+                tauri::async_runtime::block_on(async {
+                    integrations::auto_connect_integrations(state_ref).await;
+                });
             }
 
             app.manage(state);
@@ -111,6 +120,11 @@ pub fn run() {
             commands::sync::sync_all_newton_data,
             commands::sync::get_cached_newton_data,
             commands::sync::get_newton_tools,
+            // Integration commands
+            commands::integrations::save_integration,
+            commands::integrations::get_integrations,
+            commands::integrations::remove_integration,
+            commands::integrations::get_integration_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running application");

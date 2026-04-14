@@ -7,35 +7,7 @@ import { EmptyState } from '@/components/empty-state'
 import { AssignmentCard } from './assignment-card'
 import { ClipboardList, RefreshCw } from 'lucide-react'
 import { useNewtonData } from '@/stores/newton-data-store'
-import type { Assignment } from '@/types/newton'
-
-function parseToolText(data: any): any {
-  try {
-    if (!data) return null
-    const text = data?.content?.[0]?.text
-    if (text) return JSON.parse(text)
-    return data
-  } catch { return data }
-}
-
-function mapMcpAssignment(raw: any): Assignment {
-  const now = new Date()
-  const dueDate = new Date(raw.due_date)
-  let status: Assignment['status'] = raw.status || 'pending'
-  if (status === 'pending' && dueDate < now) status = 'overdue'
-
-  return {
-    id: raw.id || raw.assignment_hash || String(Math.random()),
-    title: raw.title || raw.assignment_title || 'Untitled',
-    subject: raw.subject_name || raw.subject || '',
-    due_date: raw.due_date,
-    status,
-    score: raw.score ?? raw.earned_points,
-    max_score: raw.max_score ?? raw.total_questions ?? 100,
-    description: raw.description || `${raw.completed_questions ?? 0}/${raw.total_questions ?? 0} questions completed`,
-    difficulty: raw.difficulty || 'medium',
-  }
-}
+import { parseAssignments } from '@/lib/newton-parsers'
 
 function AssignmentsSkeleton() {
   return (
@@ -55,10 +27,7 @@ function AssignmentsPage() {
   const { assignments: rawAssignments, loading, refresh } = useNewtonData()
 
   const allAssignments = useMemo(() => {
-    const raw = parseToolText(rawAssignments)
-    const list = raw?.assignments || raw
-    if (Array.isArray(list)) return list.map(mapMcpAssignment)
-    return []
+    return parseAssignments(rawAssignments)
   }, [rawAssignments])
 
   if (loading) return <AssignmentsSkeleton />
@@ -71,6 +40,7 @@ function AssignmentsPage() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      className="h-full"
     >
       <ScrollArea className="h-full">
         <div className="p-6">

@@ -1,6 +1,4 @@
 import { BookOpen, ClipboardCheck, Code2, Trophy } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
-import { cn } from '@/lib/cn'
 
 interface QuickStatsProps {
   data: {
@@ -12,54 +10,79 @@ interface QuickStatsProps {
   }
 }
 
+const STATS = (data: QuickStatsProps['data']) => [
+  {
+    label: 'Lectures Attended',
+    value: `${data.lecturesPercent}%`,
+    icon: BookOpen,
+    teal: 'hsl(var(--newton-teal))',
+    bg: 'hsl(var(--newton-teal) / 0.08)',
+    border: 'hsl(var(--newton-teal) / 0.18)',
+  },
+  {
+    label: 'Assignments Done',
+    value: `${data.assignmentsDone}/${data.totalAssignments}`,
+    icon: ClipboardCheck,
+    teal: 'hsl(var(--newton-seafoam))',
+    bg: 'hsl(var(--newton-seafoam) / 0.08)',
+    border: 'hsl(var(--newton-seafoam) / 0.18)',
+  },
+  {
+    label: 'Problems Solved',
+    value: `${data.problemsSolved}`,
+    icon: Code2,
+    teal: 'hsl(var(--newton-blue))',
+    bg: 'hsl(var(--newton-blue) / 0.08)',
+    border: 'hsl(var(--newton-blue) / 0.18)',
+  },
+  {
+    label: 'Current Rank',
+    value: data.rank > 0 ? `#${data.rank}` : '—',
+    icon: Trophy,
+    teal: 'hsl(43 90% 56%)',
+    bg: 'hsl(43 90% 56% / 0.08)',
+    border: 'hsl(43 90% 56% / 0.18)',
+  },
+]
+
 function QuickStats({ data }: QuickStatsProps) {
-  const stats = [
-    {
-      label: 'Lectures Attended',
-      value: `${data.lecturesPercent}%`,
-      icon: BookOpen,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
-    },
-    {
-      label: 'Assignments Done',
-      value: `${data.assignmentsDone}/${data.totalAssignments}`,
-      icon: ClipboardCheck,
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10',
-    },
-    {
-      label: 'Problems Solved',
-      value: `${data.problemsSolved}`,
-      icon: Code2,
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10',
-    },
-    {
-      label: 'Current Rank',
-      value: data.rank > 0 ? `#${data.rank}` : '--',
-      icon: Trophy,
-      color: 'text-yellow-500',
-      bgColor: 'bg-yellow-500/10',
-    },
-  ]
+  const stats = STATS(data)
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {stats.map((stat) => (
-        <Card key={stat.label}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', stat.bgColor)}>
-                <stat.icon className={cn('h-5 w-5', stat.color)} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold leading-none">{stat.value}</p>
-                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">{stat.label}</p>
-              </div>
+        <div
+          key={stat.label}
+          className="rounded-xl p-4 transition-all duration-200 hover:scale-[1.015] hover:-translate-y-0.5"
+          style={{
+            background: 'hsl(var(--card))',
+            border: `1px solid ${stat.border}`,
+            boxShadow: `0 1px 3px rgba(0,0,0,0.05), 0 4px 16px ${stat.bg}`,
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+              style={{ background: stat.bg, border: `1px solid ${stat.border}` }}
+            >
+              <stat.icon style={{ width: 16, height: 16, color: stat.teal }} />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p
+                className="text-[22px] font-bold leading-none tracking-tight"
+                style={{ color: stat.teal }}
+              >
+                {stat.value}
+              </p>
+              <p
+                className="text-[11px] mt-1.5 leading-tight"
+                style={{ color: 'hsl(var(--muted-foreground))' }}
+              >
+                {stat.label}
+              </p>
+            </div>
+          </div>
+        </div>
       ))}
     </div>
   )

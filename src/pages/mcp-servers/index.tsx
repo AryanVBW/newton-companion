@@ -19,6 +19,7 @@ function McpServersPage() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      className="h-full"
     >
       <ScrollArea className="h-full">
         <div className="p-6">

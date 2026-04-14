@@ -11,6 +11,7 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+use crate::ai::builtin_tools;
 use crate::ai::coordinator::Coordinator;
 use crate::ai::executor::Executor;
 use crate::ai::memory::MemoryManager;
@@ -18,6 +19,7 @@ use crate::ai::planner::Planner;
 use crate::ai::providers::{AiConfig, AiProvider};
 use crate::ai::router::ToolRouter;
 use crate::ai::types::*;
+use crate::calendar::google::GoogleCalendarClient;
 use crate::error::AppError;
 use crate::mcp::manager::McpManager;
 use crate::mcp::protocol::McpTool;
@@ -650,18 +652,34 @@ impl AgentBrain {
     // -----------------------------------------------------------------------
 
     /// Simple chat interface — sends a message through the configured LLM
-    /// with MCP tool support. Collects tools from all connected servers in parallel
-    /// and executes multiple tool calls concurrently within each response turn.
+    /// with MCP tool support + built-in tools (Google Calendar, integrations).
+    /// Collects tools from all connected servers in parallel and executes
+    /// multiple tool calls concurrently within each response turn.
+    /// Injects MCP server instructions and cached Newton data for rich context.
     pub async fn chat(
         &mut self,
         message: &str,
         history: Vec<ChatMessage>,
         mcp_manager: &Arc<Mutex<McpManager>>,
+        google_calendar: &Arc<Mutex<GoogleCalendarClient>>,
+        db: &Arc<std::sync::Mutex<Connection>>,
     ) -> Result<(String, Vec<ChatMessage>, std::collections::HashMap<String, String>), AppError> {
         let config = self.get_config();
 
-        // Collect MCP tools and build tool→server map
-        let (tools_openai, tool_server_map, tool_descriptions) = {
+        // Check Google Calendar connection status
+        let calendar_connected = {
+            let gcal = google_calendar.lock().await;
+            gcal.is_connected()
+        };
+
+        // Check if Notion MCP is connected
+        let notion_connected = {
+            let mgr = mcp_manager.lock().await;
+            mgr.is_connected("integration-notion")
+        };
+
+        // Collect MCP tools, build tool→server map, and gather server instructions
+        let (mut tools_openai, mut tool_server_map, mut tool_descriptions, server_instructions) = {
             let manager = mcp_manager.lock().await;
             let server_ids = manager.connected_server_ids();
             let mut all_tools: Vec<Value> = Vec::new();
@@ -669,6 +687,8 @@ impl AgentBrain {
                 std::collections::HashMap::new();
             // server_id → list of (tool_name, description)
             let mut server_tool_list: Vec<(String, Vec<(String, String)>)> = Vec::new();
+            // Collect server instructions from MCP initialize handshake
+            let instructions = manager.all_server_instructions();
 
             for sid in &server_ids {
                 match manager.list_tools(sid).await {
@@ -694,8 +714,24 @@ impl AgentBrain {
                 }
             }
 
-            (all_tools, tool_map, server_tool_list)
+            (all_tools, tool_map, server_tool_list, instructions)
         };
+
+        // Add built-in tools (calendar, integrations check)
+        let builtin_tools = builtin_tools::builtin_tool_definitions(calendar_connected);
+        if !builtin_tools.is_empty() {
+            let builtin_openai = AiBrain::mcp_tools_to_openai_functions(&builtin_tools);
+            let mut builtin_pairs = Vec::new();
+            for tool in &builtin_tools {
+                tool_server_map.insert(tool.name.clone(), "__builtin__".to_string());
+                builtin_pairs.push((
+                    tool.name.clone(),
+                    tool.description.clone().unwrap_or_default(),
+                ));
+            }
+            tool_descriptions.push(("Built-in (Newton Companion)".to_string(), builtin_pairs));
+            tools_openai.extend(builtin_openai);
+        }
 
         let mut brain = AiBrain::new();
         brain.configure(config);
@@ -704,8 +740,17 @@ impl AgentBrain {
         let mut messages = history;
         let has_system = messages.first().map(|m| m.role == "system").unwrap_or(false);
 
-        if !has_system && !tool_descriptions.is_empty() {
-            let system_content = Self::build_mcp_system_prompt(&tool_descriptions);
+        if !has_system {
+            // Load cached Newton data summary for context injection
+            let cached_summary = Self::build_cached_data_summary(db);
+
+            let system_content = Self::build_mcp_system_prompt(
+                &tool_descriptions,
+                calendar_connected,
+                notion_connected,
+                &server_instructions,
+                &cached_summary,
+            );
             messages.insert(0, ChatMessage {
                 role: "system".to_string(),
                 content: Some(system_content),
@@ -722,13 +767,34 @@ impl AgentBrain {
         });
 
         let mcp_clone = mcp_manager.clone();
+        let gcal_clone = google_calendar.clone();
         let tsm_clone = tool_server_map.clone();
 
         let (response_text, final_messages) = brain
             .chat_with_tools(messages, &tools_openai, |tool_name, arguments_str| {
                 let mgr = mcp_clone.clone();
+                let gcal = gcal_clone.clone();
                 let tsm = tsm_clone.clone();
                 async move {
+                    let args: Value = serde_json::from_str(&arguments_str)
+                        .unwrap_or(Value::Object(Default::default()));
+
+                    // Route to built-in tools or MCP
+                    if builtin_tools::is_builtin_tool(&tool_name) {
+                        let notion_connected = {
+                            let m = mgr.lock().await;
+                            m.is_connected("integration-notion")
+                        };
+                        return builtin_tools::execute_builtin_tool(
+                            &tool_name,
+                            args,
+                            &gcal,
+                            notion_connected,
+                        )
+                        .await;
+                    }
+
+                    // MCP tool execution
                     let server_id = tsm.get(&tool_name).cloned().ok_or_else(|| {
                         AppError::mcp(format!(
                             "No MCP server found for tool '{}'. Available tools: {:?}",
@@ -736,9 +802,6 @@ impl AgentBrain {
                             tsm.keys().collect::<Vec<_>>()
                         ))
                     })?;
-
-                    let args: Value = serde_json::from_str(&arguments_str)
-                        .unwrap_or(Value::Object(Default::default()));
 
                     let manager = mgr.lock().await;
                     let result = manager.call_tool(&server_id, &tool_name, args).await?;
@@ -760,37 +823,221 @@ impl AgentBrain {
         Ok((response_text, final_messages, tool_server_map))
     }
 
-    /// Build a system prompt that describes all available MCP tools grouped by server.
-    /// This instructs the LLM to call tools intelligently and in parallel when possible.
-    fn build_mcp_system_prompt(server_tool_list: &[(String, Vec<(String, String)>)]) -> String {
+    /// Build a system prompt that describes all available tools and integrations.
+    /// Injects MCP server instructions (especially Newton School's detailed
+    /// platform context) and a summary of cached student data so the LLM
+    /// has immediate context without re-fetching.
+    fn build_mcp_system_prompt(
+        server_tool_list: &[(String, Vec<(String, String)>)],
+        calendar_connected: bool,
+        notion_connected: bool,
+        server_instructions: &[(String, String)],
+        cached_data_summary: &str,
+    ) -> String {
         let mut lines = Vec::new();
-        lines.push("You are Newton Companion, an intelligent AI assistant for Newton School students.".to_string());
-        lines.push("You have access to real-time data via MCP (Model Context Protocol) tool servers.".to_string());
-        lines.push(String::new());
-        lines.push("## Available MCP Tool Servers".to_string());
+
+        // Core identity
+        lines.push("You are Newton Companion, an intelligent AI brain for Newton School students.".to_string());
+        lines.push("You are NOT just a chatbot — you are an autonomous agent that can take real actions.".to_string());
         lines.push(String::new());
 
-        for (server_id, tools) in server_tool_list {
-            lines.push(format!("### Server: `{}`", server_id));
-            for (name, desc) in tools {
-                let desc_short = if desc.is_empty() {
-                    "No description".to_string()
-                } else {
-                    desc.chars().take(120).collect()
-                };
-                lines.push(format!("- **{}**: {}", name, desc_short));
+        // Integration awareness
+        lines.push("## Connected Integrations".to_string());
+        if calendar_connected {
+            lines.push("- **Google Calendar**: CONNECTED — You can create, list, and delete calendar events.".to_string());
+        } else {
+            lines.push("- **Google Calendar**: Not connected — Suggest the user connect it in Integrations.".to_string());
+        }
+        if notion_connected {
+            lines.push("- **Notion**: CONNECTED — You can search, read, create, and update Notion pages and databases.".to_string());
+        } else {
+            lines.push("- **Notion**: Not connected — Suggest the user add their Notion API key in Integrations.".to_string());
+        }
+        lines.push(String::new());
+
+        // Available tools
+        if !server_tool_list.is_empty() {
+            lines.push("## Available Tools".to_string());
+            lines.push(String::new());
+
+            for (server_id, tools) in server_tool_list {
+                lines.push(format!("### {}", server_id));
+                for (name, desc) in tools {
+                    let desc_short = if desc.is_empty() {
+                        "No description".to_string()
+                    } else {
+                        desc.chars().take(150).collect()
+                    };
+                    lines.push(format!("- **{}**: {}", name, desc_short));
+                }
+                lines.push(String::new());
             }
+        }
+
+        // Capabilities
+        lines.push("## What You Can Do".to_string());
+        lines.push(String::new());
+
+        if calendar_connected {
+            lines.push("### Scheduling & Calendar".to_string());
+            lines.push("- Create study sessions, exam prep blocks, and assignment deadlines on Google Calendar".to_string());
+            lines.push("- Check the user's schedule to find free time before suggesting events".to_string());
+            lines.push("- Set appropriate reminders (e.g., 30min before lectures, 1 day before assignments)".to_string());
+            lines.push("- Use color coding: lecture=blue, contest=red, assignment=orange, assessment=purple".to_string());
             lines.push(String::new());
         }
 
+        if notion_connected {
+            lines.push("### Notes & Knowledge (Notion)".to_string());
+            lines.push("- Search existing Notion pages for relevant notes or information".to_string());
+            lines.push("- Create new pages for lecture notes, study summaries, or project plans".to_string());
+            lines.push("- Update existing pages with new information".to_string());
+            lines.push("- Organize content by linking related pages together".to_string());
+            lines.push(String::new());
+        }
+
+        if calendar_connected && notion_connected {
+            lines.push("### Cross-Linking & Orchestration".to_string());
+            lines.push("- When creating a study plan, BOTH schedule it on calendar AND create a Notion page with the plan details".to_string());
+            lines.push("- When the user asks about upcoming events, check calendar AND search Notion for related notes".to_string());
+            lines.push("- Link Notion pages to calendar events by including event IDs in page content".to_string());
+            lines.push(String::new());
+        }
+
+        // Instructions
         lines.push("## Instructions".to_string());
         lines.push("- **Always** call relevant tools to fetch real, up-to-date data before answering.".to_string());
-        lines.push("- When multiple independent data points are needed, call several tools simultaneously (in parallel) within the same response.".to_string());
+        lines.push("- When multiple independent data points are needed, call several tools simultaneously (in parallel).".to_string());
+        lines.push("- Be proactive: if the user mentions a deadline, offer to schedule study time for it.".to_string());
+        lines.push("- When scheduling, always check existing events first to avoid conflicts.".to_string());
         lines.push("- Aggregate and synthesise results from multiple tool calls into a clear, useful answer.".to_string());
         lines.push("- If a tool call returns an error, explain it and try an alternative approach.".to_string());
-        lines.push("- Format responses in clear markdown with headers and bullet points where helpful.".to_string());
+        lines.push("- Format responses in clear markdown with headers and bullet points.".to_string());
+        lines.push("- Use the current date (today) as reference for scheduling. Don't ask for dates that are obvious.".to_string());
+        lines.push("- When the user asks to 'schedule', 'plan', or 'organize' something, take action immediately by calling the appropriate tools.".to_string());
+        lines.push(String::new());
+
+        // Server instructions (injected from MCP server initialize handshake)
+        // These contain critical context, especially Newton School's platform docs.
+        if !server_instructions.is_empty() {
+            lines.push("## MCP Server Instructions".to_string());
+            lines.push(String::new());
+            for (server_id, instructions) in server_instructions {
+                lines.push(format!("### Instructions from `{}`", server_id));
+                lines.push(instructions.clone());
+                lines.push(String::new());
+            }
+        }
+
+        // Cached student data summary (so the LLM has immediate context)
+        if !cached_data_summary.is_empty() {
+            lines.push("## Current Student Data (cached snapshot)".to_string());
+            lines.push("Use this as context. For the most up-to-date data, call the relevant tools.".to_string());
+            lines.push(String::new());
+            lines.push(cached_data_summary.to_string());
+            lines.push(String::new());
+        }
 
         lines.join("\n")
+    }
+
+    // -----------------------------------------------------------------------
+    // Cached Data Summary — inject Newton data context into the AI prompt
+    // -----------------------------------------------------------------------
+
+    /// Build a concise summary of cached Newton data for the system prompt.
+    /// This gives the LLM immediate context about the student's courses,
+    /// schedule, assignments, and progress without needing tool calls.
+    fn build_cached_data_summary(db: &Arc<std::sync::Mutex<Connection>>) -> String {
+        let conn = match db.lock() {
+            Ok(c) => c,
+            Err(_) => return String::new(),
+        };
+
+        let mut summary_parts = Vec::new();
+
+        // Helper: read cached tool result from DB
+        let read_cached = |tool_name: &str| -> Option<Value> {
+            conn.query_row(
+                "SELECT response_json FROM newton_data_cache WHERE tool_name = ?1",
+                rusqlite::params![tool_name],
+                |row| {
+                    let json_str: String = row.get(0)?;
+                    Ok(serde_json::from_str::<Value>(&json_str).unwrap_or(Value::Null))
+                },
+            )
+            .ok()
+            .filter(|v| !v.is_null())
+        };
+
+        // User profile
+        if let Some(profile) = read_cached("get_me") {
+            let name = profile["name"].as_str().unwrap_or("");
+            let email = profile["email"].as_str().unwrap_or("");
+            if !name.is_empty() {
+                summary_parts.push(format!("**Student**: {} ({})", name, email));
+            }
+        }
+
+        // Courses overview
+        if let Some(overview) = read_cached("get_course_overview") {
+            let course_name = overview["course_name"].as_str().unwrap_or("");
+            let semester = overview["semester_name"].as_str().unwrap_or("");
+            let xp = overview["total_xp"].as_u64().or_else(|| overview["total_earned_points"].as_u64());
+            let rank = overview["rank"].as_u64();
+            let lectures_attended = overview["lectures_attended"].as_u64()
+                .or_else(|| overview["total_lectures_attended"].as_u64());
+            let total_lectures = overview["total_lectures"].as_u64();
+            let assignments_done = overview["assignments_completed"].as_u64()
+                .or_else(|| overview["total_completed_assignment_questions"].as_u64());
+
+            let mut parts = Vec::new();
+            if !course_name.is_empty() { parts.push(format!("Course: {}", course_name)); }
+            if !semester.is_empty() { parts.push(format!("Semester: {}", semester)); }
+            if let Some(x) = xp { parts.push(format!("XP: {}", x)); }
+            if let Some(r) = rank { parts.push(format!("Rank: #{}", r)); }
+            if let (Some(a), Some(t)) = (lectures_attended, total_lectures) {
+                parts.push(format!("Lectures: {}/{} attended", a, t));
+            }
+            if let Some(a) = assignments_done {
+                parts.push(format!("Assignments completed: {}", a));
+            }
+            if !parts.is_empty() {
+                summary_parts.push(parts.join(" | "));
+            }
+        }
+
+        // Upcoming schedule (next 3 items)
+        if let Some(schedule) = read_cached("get_upcoming_schedule") {
+            let events = schedule.as_array()
+                .or_else(|| schedule["events"].as_array())
+                .or_else(|| schedule["schedule"].as_array())
+                .or_else(|| schedule["data"].as_array());
+            if let Some(events) = events {
+                let upcoming: Vec<String> = events.iter().take(3).filter_map(|e| {
+                    let title = e["title"].as_str()
+                        .or_else(|| e["lecture_title"].as_str())
+                        .or_else(|| e["name"].as_str())?;
+                    let time = e["start_time"].as_str()
+                        .or_else(|| e["start"].as_str())
+                        .unwrap_or("TBD");
+                    Some(format!("  - {} ({})", title, time))
+                }).collect();
+                if !upcoming.is_empty() {
+                    summary_parts.push(format!("**Upcoming**:\n{}", upcoming.join("\n")));
+                }
+            }
+        }
+
+        // Arena stats
+        if let Some(arena) = read_cached("get_arena_stats") {
+            let solved = arena["solved_questions_count"].as_u64();
+            if let Some(s) = solved {
+                summary_parts.push(format!("**Arena**: {} problems solved", s));
+            }
+        }
+
+        summary_parts.join("\n")
     }
 
     // -----------------------------------------------------------------------

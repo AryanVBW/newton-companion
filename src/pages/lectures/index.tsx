@@ -10,40 +10,7 @@ import { ListView } from './list-view'
 import { LectureDetailPanel } from './lecture-detail-panel'
 import { useNewtonData } from '@/stores/newton-data-store'
 import type { Lecture } from '@/types/newton'
-
-function parseToolText(data: any): any {
-  try {
-    if (!data) return null
-    const text = data?.content?.[0]?.text
-    if (text) return JSON.parse(text)
-    return data
-  } catch { return data }
-}
-
-function mapMcpLecture(raw: any): Lecture {
-  const now = new Date()
-  const startTime = new Date(raw.start_time)
-  const isUpcoming = startTime > now
-  let status: Lecture['status'] = 'upcoming'
-  if (raw.attended) status = 'attended'
-  else if (isUpcoming) status = 'upcoming'
-  else if (raw.has_recording) status = 'recording'
-  else status = 'missed'
-
-  return {
-    id: raw.lecture_hash || raw.id || String(Math.random()),
-    title: raw.lecture_title || raw.title || 'Untitled',
-    subject: raw.subject_name || raw.subject || '',
-    instructor: raw.instructor_user?.name || raw.instructor || '',
-    date: startTime.toISOString().split('T')[0],
-    start_time: startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-    end_time: new Date(raw.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-    status,
-    recording_url: raw.recording_url,
-    description: raw.description || '',
-    topics: raw.topics || [],
-  }
-}
+import { parseLectures } from '@/lib/newton-parsers'
 
 function LecturesSkeleton() {
   return (
@@ -64,10 +31,7 @@ function LecturesPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
 
   const lectures = useMemo(() => {
-    const raw = parseToolText(recentLectures)
-    const list = raw?.lectures || raw
-    if (Array.isArray(list)) return list.map(mapMcpLecture)
-    return []
+    return parseLectures(recentLectures)
   }, [recentLectures])
 
   if (loading) return <LecturesSkeleton />

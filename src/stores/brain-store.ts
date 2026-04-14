@@ -1,6 +1,13 @@
 import { create } from 'zustand'
-import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import {
+  cancelBrainGoal,
+  clearBrainMemory,
+  executeBrainGoal,
+  getBrainHistory,
+  getBrainStatus,
+} from '@/lib/api/ai'
+import { getErrorMessage } from '@/lib/error-utils'
 
 // ---------------------------------------------------------------------------
 // Types — mirrors the Rust BrainEvent enum
@@ -149,7 +156,7 @@ export const useBrainStore = create<BrainStore>((set, get) => ({
     set({ _unlisten: unlisten })
 
     // Load initial status
-    get().loadStatus()
+    void get().loadStatus()
   },
 
   cleanup: () => {
@@ -164,16 +171,13 @@ export const useBrainStore = create<BrainStore>((set, get) => ({
     set({ isRunning: true, lastError: null, lastResult: null })
 
     try {
-      const result = await invoke<{ success: boolean; result: string }>(
-        'brain_execute_goal',
-        { goal, context }
-      )
+      const result = await executeBrainGoal(goal, context)
       set({ lastResult: result.result, isRunning: false })
       // Refresh history after completion
-      get().loadHistory()
+      void get().loadHistory()
       return result.result
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error)
+      const errorMsg = getErrorMessage(error, 'Failed to execute goal')
       set({ lastError: errorMsg, isRunning: false })
       throw error
     }
@@ -181,7 +185,7 @@ export const useBrainStore = create<BrainStore>((set, get) => ({
 
   cancelGoal: async () => {
     try {
-      await invoke('brain_cancel_goal')
+      await cancelBrainGoal()
     } catch (error) {
       console.error('Failed to cancel goal:', error)
     }
@@ -189,7 +193,7 @@ export const useBrainStore = create<BrainStore>((set, get) => ({
 
   loadStatus: async () => {
     try {
-      const status = await invoke<BrainStatus>('brain_get_status')
+      const status = await getBrainStatus()
       set({ status, isRunning: status.is_running })
     } catch (error) {
       console.error('Failed to load brain status:', error)
@@ -198,9 +202,7 @@ export const useBrainStore = create<BrainStore>((set, get) => ({
 
   loadHistory: async (limit = 20) => {
     try {
-      const result = await invoke<{ goals: BrainGoal[] }>('brain_get_history', {
-        limit,
-      })
+      const result = await getBrainHistory(limit)
       set({ history: result.goals })
     } catch (error) {
       console.error('Failed to load brain history:', error)
@@ -209,7 +211,7 @@ export const useBrainStore = create<BrainStore>((set, get) => ({
 
   clearMemory: async (category?: string) => {
     try {
-      await invoke('brain_clear_memory', { category })
+      await clearBrainMemory(category)
     } catch (error) {
       console.error('Failed to clear memory:', error)
     }

@@ -101,6 +101,17 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
             fetched_at    TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
+        -- Integration configs (Notion, Google Docs, etc.)
+        CREATE TABLE IF NOT EXISTS integrations (
+            id          TEXT PRIMARY KEY NOT NULL,
+            provider    TEXT NOT NULL,
+            api_key     TEXT NOT NULL DEFAULT '',
+            enabled     INTEGER NOT NULL DEFAULT 1,
+            config_json TEXT NOT NULL DEFAULT '{}',
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
         -- Stores the list of tools discovered from newton-mcp
         CREATE TABLE IF NOT EXISTS newton_mcp_tools (
             name          TEXT PRIMARY KEY NOT NULL,

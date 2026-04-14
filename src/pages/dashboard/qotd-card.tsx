@@ -3,18 +3,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { StreakBadge } from '@/components/streak-badge'
 import { Zap, ArrowRight, CheckCircle2, HelpCircle } from 'lucide-react'
-
-interface QotdData {
-  title?: string
-  difficulty?: string
-  streak?: number
-  completed_today?: boolean
-  url?: string
-  category?: string
-}
+import type { QOTD } from '@/types/newton'
 
 interface QotdCardProps {
-  data?: QotdData | null
+  data?: QOTD | null
 }
 
 const difficultyVariant: Record<string, 'success' | 'warning' | 'destructive'> = {

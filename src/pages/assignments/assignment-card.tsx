@@ -23,11 +23,14 @@ const difficultyConfig: Record<string, { label: string; variant: 'success' | 'wa
 }
 
 function AssignmentCard({ assignment }: AssignmentCardProps) {
-  const status = statusConfig[assignment.status]
-  const difficulty = difficultyConfig[assignment.difficulty]
-  const dueDate = parseISO(assignment.due_date)
-  const isOverdue = isPast(dueDate) && assignment.status === 'pending'
-  const hoursLeft = differenceInHours(dueDate, new Date())
+  const status = statusConfig[assignment.status] ?? { label: assignment.status, variant: 'secondary' as const }
+  const difficulty = difficultyConfig[assignment.difficulty] ?? { label: assignment.difficulty || 'Medium', variant: 'warning' as const }
+
+  // Guard against missing/invalid due_date
+  const rawDue = assignment.due_date
+  const dueDate = rawDue ? parseISO(rawDue) : null
+  const isOverdue = dueDate ? isPast(dueDate) && assignment.status === 'pending' : false
+  const hoursLeft = dueDate ? differenceInHours(dueDate, new Date()) : 0
   const isUrgent = hoursLeft > 0 && hoursLeft < 24
 
   return (
@@ -61,7 +64,7 @@ function AssignmentCard({ assignment }: AssignmentCardProps) {
         <div className="flex items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            {format(dueDate, 'MMM d, yyyy')}
+            {dueDate ? format(dueDate, 'MMM d, yyyy') : 'No due date'}
           </span>
           {isUrgent && !isOverdue && (
             <span className="flex items-center gap-1 text-yellow-500">

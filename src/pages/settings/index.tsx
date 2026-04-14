@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Sun, Moon, Monitor, Brain, Bell, Calendar, Info,
+  Sun, Moon, Monitor, Brain, Calendar, Info,
   ExternalLink, RefreshCw, Unplug, Globe, Sparkles, Terminal,
-  Smartphone, Link2, Wifi, Loader2, Copy, X, ChevronRight,
+  Smartphone, Link2, Loader2, Copy, X,
   Palette, Shield, Cpu, BellDot, LayoutGrid,
 } from 'lucide-react'
-import { invoke } from '@/lib/tauri'
 import { Input } from '@/components/ui/input'
 import { Select, SelectItem } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { useUiStore } from '@/stores/ui-store'
 import { useNewtonAuthStore } from '@/stores/newton-auth-store'
 import { AI_PROVIDERS } from '@/lib/constants'
+import { configureAi, getAiConfig } from '@/lib/api/ai'
 import { cn } from '@/lib/cn'
+import { getErrorMessage } from '@/lib/error-utils'
 import { LogoIcon, LogoWordmark } from '@/components/newton-logo'
 
 /* ── tiny brand icons ─────────────────────────────────────── */
@@ -34,7 +34,7 @@ function ClaudeIcon({ className }: { className?: string }) {
   )
 }
 
-const PROVIDER_ICONS: Record<string, any> = {
+const PROVIDER_ICONS: Record<string, React.ElementType> = {
   github: GitHubIcon,
   github_copilot: GitHubIcon,
   claude: ClaudeIcon,
@@ -283,13 +283,13 @@ function AiSection() {
 
   // Load current config from backend on mount
   useEffect(() => {
-    invoke<any>('ai_get_config').then((cfg) => {
+    getAiConfig().then((cfg) => {
       if (cfg?.provider) {
         setSelectedProvider(cfg.provider)
         setSelectedModel(cfg.model_id || '')
         setHasKey(cfg.has_key || false)
       }
-    }).catch(() => {})
+    }).catch(() => undefined)
   }, [])
 
   const provider = AI_PROVIDERS.find((p) => p.id === selectedProvider)
@@ -299,17 +299,17 @@ function AiSection() {
     setSaving(true)
     setSaveError(null)
     try {
-      await invoke('ai_configure', {
+      await configureAi({
         provider: selectedProvider,
         baseUrl: '',
-        apiKey: apiKey,
+        apiKey,
         modelId: selectedModel,
       })
       setSaved(true)
       if (apiKey) setHasKey(true)
       setTimeout(() => setSaved(false), 2500)
-    } catch (err: any) {
-      setSaveError(err?.message || String(err))
+    } catch (error) {
+      setSaveError(getErrorMessage(error, 'Could not save AI settings'))
     } finally {
       setSaving(false)
     }

@@ -241,6 +241,28 @@ impl McpManager {
             .and_then(|c| c.server_info.as_ref())
     }
 
+    /// Get server instructions (from the MCP initialize handshake).
+    /// These describe how to use the server's tools.
+    pub fn get_server_instructions(&self, server_id: &str) -> Option<&str> {
+        self.connections
+            .get(server_id)
+            .and_then(|c| c.server_info.as_ref())
+            .and_then(|info| info.instructions.as_deref())
+    }
+
+    /// Collect instructions from all connected servers.
+    pub fn all_server_instructions(&self) -> Vec<(String, String)> {
+        self.connections
+            .iter()
+            .filter_map(|(id, conn)| {
+                conn.server_info
+                    .as_ref()
+                    .and_then(|info| info.instructions.as_ref())
+                    .map(|instr| (id.clone(), instr.clone()))
+            })
+            .collect()
+    }
+
     /// Check if a server is currently connected.
     pub fn is_connected(&self, server_id: &str) -> bool {
         self.connections.contains_key(server_id)

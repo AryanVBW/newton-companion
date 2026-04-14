@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-type Page = 'dashboard' | 'lectures' | 'assignments' | 'arena' | 'chat' | 'mcp-servers' | 'settings'
+type Page = 'dashboard' | 'lectures' | 'assignments' | 'arena' | 'chat' | 'integrations' | 'mcp-servers' | 'settings'
 type Theme = 'dark' | 'light' | 'system'
 
 interface UiState {

@@ -2,30 +2,15 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { GraduationCap, BookOpen, ChevronRight, Loader2, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { invoke } from '@/lib/tauri'
+import { listNewtonCourses } from '@/lib/api/newton'
+import { getErrorMessage } from '@/lib/error-utils'
+import type { CourseListItem } from '@/types/newton'
 
-interface CourseOption {
-  course_hash: string
-  course_name: string
-  semester_name: string | null
-  is_primary: boolean
-  subjects: { name: string; subject_hash: string }[]
-}
+type CourseOption = CourseListItem
 
 interface CourseSelectStepProps {
   onNext: (courseHash: string, courseName: string, semesterName: string | null) => void
   onBack: () => void
-}
-
-function parseToolText(data: any): any {
-  try {
-    if (!data) return null
-    const text = data?.content?.[0]?.text
-    if (text) return JSON.parse(text)
-    return data
-  } catch {
-    return data
-  }
 }
 
 function CourseSelectStep({ onNext, onBack }: CourseSelectStepProps) {
@@ -40,20 +25,19 @@ function CourseSelectStep({ onNext, onBack }: CourseSelectStepProps) {
       setLoading(true)
       setError(null)
       try {
-        const result = await invoke<any>('mcp_call_tool', {
-          serverId: 'newton-school',
-          toolName: 'list_courses',
-          args: {},
-        })
-        const parsed = parseToolText(result)
-        const courseList: CourseOption[] = parsed?.courses || []
+        const courseList = await listNewtonCourses()
         setCourses(courseList)
         // Auto-select primary course
         const primary = courseList.find((c) => c.is_primary)
         if (primary) setSelected(primary.course_hash)
         else if (courseList.length > 0) setSelected(courseList[0].course_hash)
-      } catch (err: any) {
-        setError('Could not load courses. Make sure your device is linked.')
+      } catch (error) {
+        setError(
+          getErrorMessage(
+            error,
+            'Could not load courses. Make sure your device is linked.'
+          )
+        )
       } finally {
         setLoading(false)
       }

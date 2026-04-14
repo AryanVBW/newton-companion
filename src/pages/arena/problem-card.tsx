@@ -14,10 +14,17 @@ const difficultyConfig = {
 }
 
 function ProblemCard({ problem }: ProblemCardProps) {
-  const diff = difficultyConfig[problem.difficulty]
+  const diff = difficultyConfig[problem.difficulty] ?? { variant: 'secondary' as const, color: 'text-[hsl(var(--muted-foreground))]' }
+
+  const handleClick = () => {
+    if (problem.url) {
+      window.open(problem.url, '_blank')
+    }
+  }
 
   return (
     <div
+      onClick={handleClick}
       className={cn(
         'rounded-lg border p-4 transition-all hover:border-[hsl(var(--primary))]/30 cursor-pointer',
         problem.solved && 'opacity-70'

@@ -7,35 +7,45 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'default', size = 'default', ...props }, ref) => {
+  ({ className, variant = 'default', size = 'default', style, ...props }, ref) => {
     return (
       <button
         className={cn(
-          'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius)] text-sm font-medium transition-colors',
+          'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius)] text-sm font-medium',
+          'transition-all duration-150 ease-out',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2',
           'disabled:pointer-events-none disabled:opacity-50',
-          'cursor-pointer',
+          'cursor-pointer active:scale-[0.98]',
           {
-            'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary))]/90':
+            // Default — Newton gradient
+            'text-white shadow-sm hover:opacity-90 hover:shadow-md':
               variant === 'default',
             'bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:bg-[hsl(var(--secondary))]/80':
               variant === 'secondary',
-            'border border-[hsl(var(--input))] bg-transparent hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]':
+            'border border-[hsl(var(--input))] bg-transparent hover:bg-[hsl(var(--accent))/0.1] hover:text-[hsl(var(--accent))]':
               variant === 'outline',
-            'hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]':
+            'hover:bg-[hsl(var(--accent))/0.1] hover:text-[hsl(var(--accent))]':
               variant === 'ghost',
             'bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:bg-[hsl(var(--destructive))]/90':
               variant === 'destructive',
             'text-[hsl(var(--primary))] underline-offset-4 hover:underline': variant === 'link',
           },
           {
-            'h-10 px-4 py-2': size === 'default',
-            'h-9 rounded-md px-3': size === 'sm',
-            'h-11 rounded-md px-8': size === 'lg',
-            'h-10 w-10': size === 'icon',
+            'h-9 px-4 py-2': size === 'default',
+            'h-8 rounded-lg px-3 text-xs': size === 'sm',
+            'h-11 rounded-xl px-8 text-[15px]': size === 'lg',
+            'h-9 w-9': size === 'icon',
           },
           className
         )}
+        style={
+          variant === 'default' && !style
+            ? {
+                background: 'linear-gradient(135deg, #78C7CE 0%, #7E9ACF 100%)',
+                boxShadow: '0 2px 12px rgba(120,199,206,0.25)',
+              }
+            : style
+        }
         ref={ref}
         {...props}
       />

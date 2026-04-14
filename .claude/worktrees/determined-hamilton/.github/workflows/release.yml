@@ -1,0 +1,154 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 0.1.0, 0.2.0-beta.1)"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark as pre-release?"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: "Newton Companion"
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+        include:
+          - target: aarch64-apple-darwin
+            arch: arm64
+            suffix: apple-silicon
+          - target: x86_64-apple-darwin
+            arch: x64
+            suffix: intel
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Update version in tauri.conf.json
+        run: |
+          cd src-tauri
+          sed -i '' 's/"version": ".*"/"version": "${{ inputs.version }}"/' tauri.conf.json
+          cat tauri.conf.json | grep version
+
+      - name: Update version in Cargo.toml
+        run: |
+          cd src-tauri
+          sed -i '' 's/^version = ".*"/version = "${{ inputs.version }}"/' Cargo.toml
+
+      - name: Update version in package.json
+        run: |
+          sed -i '' 's/"version": ".*"/"version": "${{ inputs.version }}"/' package.json
+
+      - name: Build Tauri app
+        run: npm run tauri build -- --target ${{ matrix.target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+
+          # Find the DMG
+          DMG=$(find src-tauri/target/${{ matrix.target }}/release/bundle/dmg -name "*.dmg" 2>/dev/null | head -1)
+          if [ -n "$DMG" ]; then
+            cp "$DMG" "artifacts/Newton-Companion-${{ inputs.version }}-${{ matrix.suffix }}.dmg"
+          fi
+
+          # Create zip from .app
+          APP=$(find src-tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" -maxdepth 1 2>/dev/null | head -1)
+          if [ -n "$APP" ]; then
+            cd src-tauri/target/${{ matrix.target }}/release/bundle/macos
+            zip -r "$GITHUB_WORKSPACE/artifacts/Newton-Companion-${{ inputs.version }}-${{ matrix.suffix }}.zip" "$(basename "$APP")"
+            cd "$GITHUB_WORKSPACE"
+          fi
+
+          ls -lh artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: newton-companion-${{ matrix.suffix }}
+          path: artifacts/*
+
+  release:
+    needs: build-macos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: List release files
+        run: ls -lhR release-assets/
+
+      - name: Generate checksums
+        run: |
+          cd release-assets
+          shasum -a 256 * > checksums-sha256.txt
+          cat checksums-sha256.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: "${{ env.APP_NAME }} v${{ inputs.version }}"
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          body: |
+            ## Installation
+
+            ### Quick Install (recommended)
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
+            ```
+
+            ### Manual Install
+            1. Download the `.dmg` or `.zip` for your Mac:
+               - **Apple Silicon** (M1/M2/M3/M4): `*-apple-silicon.dmg`
+               - **Intel**: `*-intel.dmg`
+            2. Open the DMG and drag to Applications
+            3. Run `newton-mcp login` in Terminal if not already signed in
+
+            ## What's New
+            See the auto-generated changelog below.
+
+          files: |
+            release-assets/*

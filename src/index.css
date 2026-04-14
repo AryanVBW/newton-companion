@@ -1,69 +1,126 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────
+   NEWTON COMPANION — Design System v2
+   Brand palette:
+     teal    #78C7CE  hsl(185 48% 64%)
+     blue    #7E9ACF  hsl(215 44% 65%)
+     seafoam #84CEBF  hsl(168 40% 66%)
+───────────────────────────────────────────────────────────── */
+
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 262 83% 58%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 262 83% 58%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
-  --success: 142 76% 36%;
-  --success-foreground: 0 0% 98%;
-  --warning: 38 92% 50%;
-  --warning-foreground: 0 0% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 262 83% 58%;
-  --radius: 0.625rem;
+  /* Newton brand */
+  --newton-teal:    185 52% 55%;
+  --newton-blue:    215 44% 62%;
+  --newton-seafoam: 168 42% 60%;
+
+  /* ── Light mode ── */
+  --background:         210 22% 97%;
+  --foreground:         222 28% 12%;
+  --card:               0 0% 100%;
+  --card-foreground:    222 28% 12%;
+  --popover:            0 0% 100%;
+  --popover-foreground: 222 28% 12%;
+  --primary:            185 52% 40%;
+  --primary-foreground: 0 0% 100%;
+  --secondary:          215 18% 92%;
+  --secondary-foreground: 222 20% 30%;
+  --muted:              215 18% 92%;
+  --muted-foreground:   220 12% 48%;
+  --accent:             185 52% 40%;
+  --accent-foreground:  0 0% 100%;
+  --destructive:        0 80% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --success:            155 58% 38%;
+  --success-foreground: 0 0% 100%;
+  --warning:            38 88% 48%;
+  --warning-foreground: 0 0% 100%;
+  --border:             220 16% 88%;
+  --input:              220 16% 88%;
+  --ring:               185 52% 40%;
+  --radius:             0.75rem;
+
+  /* Sidebar (light) */
+  --sidebar-bg:              215 22% 93%;
+  --sidebar-border:          220 16% 86%;
+  --sidebar-item-text:       rgba(28, 38, 60, 0.52);
+  --sidebar-item-text-hover: rgba(28, 38, 60, 0.88);
+  --sidebar-item-text-active: hsl(185 52% 32%);
+  --sidebar-item-hover:      rgba(120, 199, 206, 0.12);
+  --sidebar-item-active-from: rgba(120, 199, 206, 0.18);
+  --sidebar-item-active-to:  rgba(126, 154, 207, 0.12);
+  --sidebar-item-active-border: rgba(120, 199, 206, 0.28);
+  --sidebar-separator:       rgba(0, 0, 0, 0.07);
+  --sidebar-user-text:       rgba(28, 38, 60, 0.8);
+  --sidebar-user-sub:        rgba(28, 38, 60, 0.42);
+
+  /* Glass */
+  --glass-bg:     rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.9);
+  --glow-primary: rgba(120, 199, 206, 0.18);
 }
 
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 5.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 5.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 262 83% 68%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 262 83% 68%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
+  /* ── Dark mode — deep navy ── */
+  --background:         222 32% 7%;
+  --foreground:         210 20% 94%;
+  --card:               222 28% 10%;
+  --card-foreground:    210 20% 94%;
+  --popover:            222 28% 10%;
+  --popover-foreground: 210 20% 94%;
+  --primary:            185 52% 58%;
+  --primary-foreground: 222 32% 7%;
+  --secondary:          222 24% 15%;
+  --secondary-foreground: 210 16% 80%;
+  --muted:              222 24% 15%;
+  --muted-foreground:   215 14% 52%;
+  --accent:             185 52% 58%;
+  --accent-foreground:  222 32% 7%;
+  --destructive:        0 56% 52%;
   --destructive-foreground: 0 0% 98%;
-  --success: 142 76% 46%;
+  --success:            155 48% 52%;
   --success-foreground: 0 0% 98%;
-  --warning: 38 92% 60%;
+  --warning:            38 80% 60%;
   --warning-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 262 83% 68%;
+  --border:             222 22% 16%;
+  --input:              222 22% 16%;
+  --ring:               185 52% 58%;
+
+  /* Sidebar (dark) — deepest surface */
+  --sidebar-bg:              222 36% 6%;
+  --sidebar-border:          rgba(120, 199, 206, 0.07);
+  --sidebar-item-text:       rgba(255, 255, 255, 0.44);
+  --sidebar-item-text-hover: rgba(255, 255, 255, 0.82);
+  --sidebar-item-text-active: #ffffff;
+  --sidebar-item-hover:      rgba(255, 255, 255, 0.05);
+  --sidebar-item-active-from: rgba(120, 199, 206, 0.16);
+  --sidebar-item-active-to:  rgba(126, 154, 207, 0.10);
+  --sidebar-item-active-border: rgba(120, 199, 206, 0.20);
+  --sidebar-separator:       rgba(120, 199, 206, 0.08);
+  --sidebar-user-text:       rgba(255, 255, 255, 0.88);
+  --sidebar-user-sub:        rgba(120, 199, 206, 0.55);
+
+  /* Glass */
+  --glass-bg:     rgba(10, 17, 30, 0.55);
+  --glass-border: rgba(120, 199, 206, 0.12);
+  --glow-primary: rgba(120, 199, 206, 0.16);
 }
 
-* {
-  border-color: hsl(var(--border));
-}
+/* ── Reset ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+* { border-color: hsl(var(--border)); }
 
 body {
   margin: 0;
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  line-height: 1.5;
+  font-size: 13.5px;
 }
 
 #root {
@@ -71,8 +128,215 @@ body {
   height: 100vh;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+/* ── Typography ─────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+/* ── Newton Sidebar ─────────────────────────────────────── */
+.newton-sidebar {
+  background: hsl(var(--sidebar-bg));
+  border-right: 1px solid hsl(var(--sidebar-border));
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+/* Subtle sidebar texture pattern (dark only) */
+.dark .newton-sidebar {
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(120,199,206,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 50% 100%, rgba(126,154,207,0.04) 0%, transparent 70%);
+  background-color: hsl(var(--sidebar-bg));
+}
+
+/* ── Logo word in sidebar — adapts to theme ────────────── */
+.sidebar-wordmark {
+  transition: filter 0.2s ease, opacity 0.2s ease;
+}
+.dark .sidebar-wordmark {
+  filter: brightness(0) invert(1);
+  opacity: 0.88;
+}
+:root:not(.dark) .sidebar-wordmark {
+  filter: brightness(0) saturate(0);
+  opacity: 0.72;
+}
+
+/* ── Navigation Items ───────────────────────────────────── */
+.newton-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--sidebar-item-text);
+  cursor: pointer;
+  transition: all 0.13s ease;
+  border: 1px solid transparent;
+  width: 100%;
+  text-align: left;
+  background: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.newton-nav-item:hover {
+  color: var(--sidebar-item-text-hover);
+  background: var(--sidebar-item-hover);
+}
+
+.newton-nav-item.active {
+  color: var(--sidebar-item-text-active);
+  background: linear-gradient(135deg, var(--sidebar-item-active-from) 0%, var(--sidebar-item-active-to) 100%);
+  border-color: var(--sidebar-item-active-border);
+}
+
+.newton-nav-item.active .nav-pill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, hsl(var(--newton-teal)) 0%, hsl(var(--newton-seafoam)) 100%);
+  box-shadow: 0 0 8px rgba(120, 199, 206, 0.4);
+}
+
+/* ── Sidebar separator ──────────────────────────────────── */
+.sidebar-sep {
+  height: 1px;
+  background: var(--sidebar-separator);
+  margin: 0 16px;
+}
+
+/* ── Glass Cards ─────────────────────────────────────────── */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* ── Gradient Text ───────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, hsl(var(--newton-teal)) 0%, hsl(var(--newton-blue)) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glow ────────────────────────────────────────────────── */
+.newton-glow {
+  box-shadow: 0 0 32px var(--glow-primary), 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Page header gradient band ───────────────────────────── */
+.page-header-gradient {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--newton-teal) / 0.06) 0%,
+    hsl(var(--newton-blue) / 0.04) 50%,
+    transparent 100%
+  );
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* ── Stat Cards ──────────────────────────────────────────── */
+.stat-card-teal    { --stat-color: hsl(var(--newton-teal));    --stat-bg: hsl(var(--newton-teal) / 0.1);    }
+.stat-card-blue    { --stat-color: hsl(var(--newton-blue));    --stat-bg: hsl(var(--newton-blue) / 0.1);    }
+.stat-card-seafoam { --stat-color: hsl(var(--newton-seafoam)); --stat-bg: hsl(var(--newton-seafoam) / 0.1); }
+.stat-card-gold    { --stat-color: hsl(43 92% 54%);            --stat-bg: hsl(43 92% 54% / 0.1);            }
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: +200% center; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--glow-primary); }
+  50%       { box-shadow: 0 0 24px 4px var(--glow-primary); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-5px); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-float      { animation: float 4s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+.animate-fade-in    { animation: fade-in 0.25s ease-out both; }
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: hsl(var(--muted-foreground) / 0.18); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.30); }
+
+/* ── Onboarding background ───────────────────────────────── */
+.onboarding-bg {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -10%, hsl(var(--newton-teal) / 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 40% at 88% 85%, hsl(var(--newton-blue) / 0.08) 0%, transparent 55%),
+    hsl(var(--background));
+}
+
+/* ── Progress bar ────────────────────────────────────────── */
+.newton-progress { background: hsl(var(--muted)); border-radius: 999px; overflow: hidden; }
+.newton-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, hsl(var(--newton-teal)) 0%, hsl(var(--newton-seafoam)) 100%);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Titlebar drag region ────────────────────────────────── */
+.titlebar {
+  height: 48px;
+  background: hsl(var(--background));
+  border-bottom: 1px solid hsl(var(--border));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Window control buttons ──────────────────────────────── */
+.window-control-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border-radius: 6px;
+  color: hsl(var(--muted-foreground));
+  transition: background 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+}
+.window-control-btn:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.window-control-close:hover {
+  background: hsl(0 80% 55%);
+  color: #fff;
+}
+
+/* ── Sidebar user footer ─────────────────────────────────── */
+.sidebar-user-name { color: var(--sidebar-user-text); }
+.sidebar-user-sub  { color: var(--sidebar-user-sub); }

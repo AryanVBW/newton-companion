@@ -10,12 +10,9 @@ interface CourseOverviewCardProps {
 }
 
 function CourseOverviewCard({ data }: CourseOverviewCardProps) {
-  const overallProgress = Math.round(
-    ((data.lectures_attended / data.total_lectures +
-      data.assignments_completed / data.total_assignments) /
-      2) *
-      100
-  )
+  const lectureProgress = data.total_lectures > 0 ? data.lectures_attended / data.total_lectures : 0
+  const assignProgress = data.total_assignments > 0 ? data.assignments_completed / data.total_assignments : 0
+  const overallProgress = Math.round(((lectureProgress + assignProgress) / 2) * 100)
 
   return (
     <Card className="col-span-full lg:col-span-1">

@@ -2,15 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Clock, Calendar } from 'lucide-react'
 import { cn } from '@/lib/cn'
-
-interface ScheduleEvent {
-  id: string
-  title: string
-  type: string
-  subject_name?: string
-  start_time?: string
-  end_time?: string
-}
+import type { ScheduleEvent } from '@/types/newton'
 
 interface ScheduleTimelineProps {
   events?: ScheduleEvent[] | null

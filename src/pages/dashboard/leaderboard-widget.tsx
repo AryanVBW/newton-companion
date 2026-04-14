@@ -2,17 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar } from '@/components/ui/avatar'
 import { Medal, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
-
-interface LeaderboardEntry {
-  rank: number
-  name: string
-  xp: number
-  level: number
-  is_current_user?: boolean
-}
+import type { LeaderboardEntry } from '@/types/newton'
 
 interface LeaderboardWidgetProps {
-  data?: { leaderboard?: LeaderboardEntry[]; self_rank?: any } | null
+  data?: LeaderboardEntry[] | null
 }
 
 const medalColors: Record<number, string> = {
@@ -22,7 +15,7 @@ const medalColors: Record<number, string> = {
 }
 
 function LeaderboardWidget({ data }: LeaderboardWidgetProps) {
-  const entries: LeaderboardEntry[] = data?.leaderboard || []
+  const entries = data ?? []
 
   return (
     <Card>

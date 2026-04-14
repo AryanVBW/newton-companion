@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/cn'
 import { WelcomeStep } from './welcome-step'
 import { McpConnectStep } from './mcp-connect-step'
@@ -30,21 +30,57 @@ function OnboardingPage({ onComplete }: OnboardingPageProps) {
   }
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-[hsl(var(--background))]">
-      <div className="w-full max-w-xl px-6">
+    <div className="flex h-screen w-screen items-center justify-center onboarding-bg relative overflow-hidden">
+      {/* Ambient background orbs */}
+      <div
+        className="pointer-events-none absolute"
+        style={{
+          width: 500,
+          height: 500,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(120,199,206,0.08) 0%, transparent 70%)',
+          top: '-120px',
+          left: '20%',
+        }}
+      />
+      <div
+        className="pointer-events-none absolute"
+        style={{
+          width: 400,
+          height: 400,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(126,154,207,0.07) 0%, transparent 70%)',
+          bottom: '-80px',
+          right: '15%',
+        }}
+      />
+
+      <div className="relative w-full max-w-xl px-6">
         {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 mb-10">
+        <motion.div
+          className="flex items-center justify-center gap-2 mb-10"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-            <div
+            <motion.div
               key={i}
-              className={cn(
-                'h-1.5 rounded-full transition-all duration-300',
-                i === step ? 'w-8 bg-[hsl(var(--primary))]' : 'w-1.5 bg-[hsl(var(--muted))]',
-                i < step && 'bg-[hsl(var(--primary))]/50'
-              )}
+              className="rounded-full transition-all duration-500"
+              style={{
+                height: 4,
+                width: i === step ? 28 : 8,
+                background:
+                  i === step
+                    ? 'linear-gradient(90deg, #78C7CE, #7E9ACF)'
+                    : i < step
+                    ? 'rgba(120,199,206,0.4)'
+                    : 'hsl(var(--muted))',
+              }}
+              layout
             />
           ))}
-        </div>
+        </motion.div>
 
         <AnimatePresence mode="wait">
           {step === 0 && <WelcomeStep key="welcome" onNext={next} />}

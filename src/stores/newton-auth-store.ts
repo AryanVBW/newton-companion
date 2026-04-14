@@ -1,7 +1,20 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { invoke } from '@/lib/tauri'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import {
+  autoConnectNewton,
+  cancelNewtonLogin,
+  checkNewtonMcp,
+  fetchNewtonProfile,
+  getNewtonMcpStatus,
+  installNewtonMcp,
+  logoutNewton,
+  pollNewtonLogin,
+  startNewtonLogin,
+} from '@/lib/api/newton'
+import { getErrorMessage } from '@/lib/error-utils'
+import { useNewtonDataStore } from '@/stores/newton-data-store'
+import { useUiStore } from '@/stores/ui-store'
 
 export interface UserProfile {
   name: string
@@ -21,13 +34,11 @@ export type ConnectStatus =
   | 'error'
 
 interface NewtonAuthStore {
-  // Persisted across app restarts
   authenticated: boolean
   userName: string
   userEmail: string
   linkedAt: string
 
-  // Runtime state (not persisted)
   loading: boolean
   connectStatus: ConnectStatus
   connectError: string | null
@@ -37,7 +48,6 @@ interface NewtonAuthStore {
   _bootDone: boolean
   _loginInProgress: boolean
 
-  // Actions
   boot: () => Promise<void>
   fullConnect: () => Promise<void>
   startLogin: () => Promise<void>
@@ -47,38 +57,66 @@ interface NewtonAuthStore {
   _setRuntime: (partial: Partial<NewtonAuthStore>) => void
 }
 
-function parseToolText(data: any): any {
-  try {
-    if (!data) return null
-    if (typeof data === 'object' && !data?.content?.[0]?.text) return data
-    const text = data?.content?.[0]?.text
-    if (text) return JSON.parse(text)
-    return data
-  } catch {
-    return data
+let pollInterval: ReturnType<typeof globalThis.setInterval> | null = null
+let loginOutputUnlisten: UnlistenFn | null = null
+
+function cleanupPolling() {
+  if (pollInterval) {
+    window.clearInterval(pollInterval)
+    pollInterval = null
+  }
+
+  if (loginOutputUnlisten) {
+    loginOutputUnlisten()
+    loginOutputUnlisten = null
   }
 }
 
-let pollInterval: ReturnType<typeof setInterval> | null = null
-let unlistenFn: UnlistenFn | null = null
+async function connectAndLoadProfile(
+  set: (partial: Partial<NewtonAuthStore>) => void,
+  get: () => NewtonAuthStore
+) {
+  set({ connectStatus: 'starting_server' })
 
-function cleanupPolling() {
-  if (pollInterval) { clearInterval(pollInterval); pollInterval = null }
-  if (unlistenFn) { unlistenFn(); unlistenFn = null }
+  const connection = await autoConnectNewton()
+  if (!connection.connected) {
+    set({
+      connectStatus: 'error',
+      connectError: connection.error || 'Failed to start Newton MCP server',
+    })
+    return
+  }
+
+  set({ connectStatus: 'fetching_profile' })
+
+  try {
+    const profile = await fetchNewtonProfile()
+    set({
+      connectStatus: 'connected',
+      authenticated: true,
+      userName: profile.name,
+      userEmail: profile.email,
+      linkedAt: get().linkedAt || new Date().toISOString(),
+    })
+  } catch {
+    set({
+      connectStatus: 'connected',
+      authenticated: true,
+      linkedAt: get().linkedAt || new Date().toISOString(),
+    })
+  }
 }
 
 export const useNewtonAuthStore = create<NewtonAuthStore>()(
   persist(
     (set, get) => ({
-      // Persisted
       authenticated: false,
       userName: '',
       userEmail: '',
       linkedAt: '',
 
-      // Runtime
       loading: true,
-      connectStatus: 'idle' as ConnectStatus,
+      connectStatus: 'idle',
       connectError: null,
       deviceCode: null,
       deviceUrl: null,
@@ -88,135 +126,119 @@ export const useNewtonAuthStore = create<NewtonAuthStore>()(
 
       _setRuntime: (partial) => set(partial),
 
-      // Called ONCE from App.tsx on startup
       boot: async () => {
         if (get()._bootDone) return
+
         set({ loading: true })
 
         const state = get()
-
-        // If we have a persisted session, trust it and try to auto-connect
         if (state.authenticated && state.linkedAt) {
           set({ loading: false, _bootDone: true })
-          // Auto-connect MCP server in background
           try {
-            await invoke<any>('auto_connect_newton')
+            await autoConnectNewton()
           } catch {
-            // Server might fail to start — that's ok, data is cached
+            // Cached data still lets the app boot even if MCP startup fails.
           }
           return
         }
 
-        // No persisted session — check with newton-mcp binary
         try {
-          const result = await invoke<any>('newton_mcp_status')
-          if (result.authenticated) {
+          const status = await getNewtonMcpStatus()
+          if (status.authenticated) {
             set({
               authenticated: true,
               linkedAt: new Date().toISOString(),
-              userName: result.saved_name || '',
-              userEmail: result.saved_email || '',
+              userName: status.saved_name || '',
+              userEmail: status.saved_email || '',
               loading: false,
               _bootDone: true,
             })
-            // Auto-connect
-            try { await invoke<any>('auto_connect_newton') } catch {}
+
+            try {
+              await autoConnectNewton()
+            } catch {
+              // Ignore startup failures during background auto-connect.
+            }
+
             return
           }
-        } catch {}
+        } catch {
+          // Fall through to the logged-out state.
+        }
 
         set({ loading: false, _bootDone: true })
       },
 
-      // Full connect flow: check → install → detect auth → connect or show login
       fullConnect: async () => {
-        set({ connectStatus: 'checking_mcp', connectError: null })
+        set({
+          connectStatus: 'checking_mcp',
+          connectError: null,
+        })
 
-        let authenticated = false
-
-        // Check if authenticated (from persisted state first)
-        if (get().authenticated) {
-          authenticated = true
-        }
+        let authenticated = get().authenticated
 
         if (!authenticated) {
           try {
-            const check = await invoke<any>('check_newton_mcp')
-            authenticated = check.authenticated || false
+            const check = await checkNewtonMcp()
+            authenticated = check.authenticated
+
             if (!check.installed && !authenticated) {
               set({ connectStatus: 'installing_mcp' })
-              await invoke<any>('install_newton_mcp').catch(() => {})
+              await installNewtonMcp().catch(() => undefined)
             }
-          } catch {}
+          } catch {
+            // Fallback status check below handles missing binaries or transient errors.
+          }
         }
 
         if (!authenticated) {
           try {
-            const status = await invoke<any>('newton_mcp_status')
-            authenticated = status.authenticated || false
-          } catch {}
+            const status = await getNewtonMcpStatus()
+            authenticated = status.authenticated
+          } catch {
+            authenticated = false
+          }
         }
 
-        if (authenticated) {
-          // Start MCP server and verify
-          set({ connectStatus: 'starting_server' })
-          try {
-            const result = await invoke<any>('auto_connect_newton')
-            if (!result.connected) {
-              set({ connectStatus: 'error', connectError: result.error || 'Failed to start MCP server' })
-              return
-            }
-          } catch (err: any) {
-            set({ connectStatus: 'error', connectError: err?.message || 'Failed to start MCP server' })
-            return
-          }
-
-          // Fetch profile
-          set({ connectStatus: 'fetching_profile' })
-          try {
-            const profileResult = await invoke<any>('mcp_call_tool', {
-              serverId: 'newton-school',
-              toolName: 'get_me',
-              args: {},
-            })
-            const parsed = parseToolText(profileResult)
-            const name = parsed?.name || parsed?.user?.name || ''
-            const email = parsed?.email || parsed?.user?.email || ''
-            set({
-              connectStatus: 'connected',
-              authenticated: true,
-              userName: name,
-              userEmail: email,
-              linkedAt: get().linkedAt || new Date().toISOString(),
-            })
-          } catch {
-            // Profile fetch failed but server is connected
-            set({
-              connectStatus: 'connected',
-              authenticated: true,
-              linkedAt: get().linkedAt || new Date().toISOString(),
-            })
-          }
+        if (!authenticated) {
+          set({ connectStatus: 'not_logged_in' })
           return
         }
 
-        set({ connectStatus: 'not_logged_in' })
+        try {
+          await connectAndLoadProfile(set, get)
+        } catch (error) {
+          set({
+            connectStatus: 'error',
+            connectError: getErrorMessage(error, 'Failed to connect Newton School'),
+          })
+        }
       },
 
-      // Start interactive login — NEVER auto-opens browser
       startLogin: async () => {
         if (get()._loginInProgress) return
-        set({ _loginInProgress: true, connectStatus: 'starting_login', terminalLines: [], connectError: null })
+
+        set({
+          _loginInProgress: true,
+          connectStatus: 'starting_login',
+          terminalLines: [],
+          connectError: null,
+        })
 
         cleanupPolling()
-        try {
-          unlistenFn = await listen<string>('newton-login-output', (event) => {
-            set((s) => ({ terminalLines: [...s.terminalLines, event.payload] }))
-          })
-        } catch {}
 
         try {
-          const result = await invoke<any>('newton_mcp_start_login')
+          loginOutputUnlisten = await listen<string>('newton-login-output', (event) => {
+            set((state) => ({
+              terminalLines: [...state.terminalLines.slice(-99), event.payload],
+            }))
+          })
+        } catch {
+          // Login can still proceed even if streaming terminal output is unavailable.
+        }
+
+        try {
+          const result = await startNewtonLogin()
 
           if (result.already_authenticated) {
             cleanupPolling()
@@ -229,59 +251,62 @@ export const useNewtonAuthStore = create<NewtonAuthStore>()(
             return
           }
 
-          const code = result.code as string
-          const url = result.url as string
-
           set({
             connectStatus: 'waiting_for_auth',
-            deviceCode: code,
-            deviceUrl: url,
+            deviceCode: result.code || null,
+            deviceUrl: result.url || null,
           })
 
-          // Poll every 2s
-          pollInterval = setInterval(async () => {
+          pollInterval = globalThis.setInterval(async () => {
             try {
-              const poll = await invoke<any>('newton_mcp_poll_login')
-              if (poll.complete) {
-                cleanupPolling()
-                set({ _loginInProgress: false })
+              const poll = await pollNewtonLogin()
+              if (!poll.complete) return
 
-                if (poll.success) {
-                  set({
-                    authenticated: true,
-                    linkedAt: new Date().toISOString(),
-                  })
-                  // Now connect and fetch profile
-                  await get().fullConnect()
-                } else {
-                  set({
-                    connectStatus: 'error',
-                    connectError: 'Login was not successful. Please try again.',
-                  })
-                }
+              cleanupPolling()
+              set({ _loginInProgress: false })
+
+              if (poll.success) {
+                set({
+                  authenticated: true,
+                  linkedAt: new Date().toISOString(),
+                })
+                await get().fullConnect()
+                return
               }
-            } catch {}
+
+              set({
+                connectStatus: 'error',
+                connectError: 'Login was not successful. Please try again.',
+              })
+            } catch {
+              // Keep polling until the backend resolves the login flow.
+            }
           }, 2000)
-        } catch (err: any) {
+        } catch (error) {
           cleanupPolling()
           set({
             _loginInProgress: false,
             connectStatus: 'error',
-            connectError: err?.message || err || 'Failed to start login',
+            connectError: getErrorMessage(error, 'Failed to start login'),
           })
         }
       },
 
       cancelLogin: async () => {
         cleanupPolling()
-        set({ _loginInProgress: false, connectStatus: 'not_logged_in', deviceCode: null, deviceUrl: null })
-        await invoke('newton_mcp_cancel_login').catch(() => {})
+        set({
+          _loginInProgress: false,
+          connectStatus: 'not_logged_in',
+          deviceCode: null,
+          deviceUrl: null,
+        })
+        await cancelNewtonLogin().catch(() => undefined)
       },
 
       autoConnect: async () => {
         try {
-          const result = await invoke<any>('auto_connect_newton')
-          return result.connected || false
+          const result = await autoConnectNewton()
+          return result.connected
         } catch {
           return false
         }
@@ -289,9 +314,16 @@ export const useNewtonAuthStore = create<NewtonAuthStore>()(
 
       logout: async () => {
         cleanupPolling()
+
         try {
-          await invoke('newton_mcp_logout')
-        } catch {}
+          await logoutNewton()
+        } catch {
+          // We still clear local session state even if the backend logout fails.
+        }
+
+        useNewtonDataStore.getState().reset()
+        useUiStore.getState().setCurrentPage('settings')
+
         set({
           authenticated: false,
           userName: '',

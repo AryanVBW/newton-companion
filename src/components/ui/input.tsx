@@ -8,13 +8,23 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({ className, type, ...pr
     <input
       type={type}
       className={cn(
-        'flex h-10 w-full rounded-[var(--radius)] border border-[hsl(var(--input))] bg-transparent px-3 py-2 text-sm',
-        'file:border-0 file:bg-transparent file:text-sm file:font-medium',
+        'flex h-9 w-full rounded-lg border px-3 py-2 text-[13.5px] transition-all duration-150',
         'placeholder:text-[hsl(var(--muted-foreground))]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2',
+        'focus-visible:outline-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
+        'bg-[hsl(var(--card))] border-[hsl(var(--border))]',
         className
       )}
+      onFocus={(e) => {
+        e.currentTarget.style.borderColor = 'hsl(var(--newton-teal) / 0.55)'
+        e.currentTarget.style.boxShadow   = '0 0 0 3px hsl(var(--newton-teal) / 0.10)'
+        props.onFocus?.(e)
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.borderColor = ''
+        e.currentTarget.style.boxShadow   = ''
+        props.onBlur?.(e)
+      }}
       ref={ref}
       {...props}
     />

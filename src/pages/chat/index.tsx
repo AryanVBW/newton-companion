@@ -11,13 +11,14 @@ import {
   Wrench,
   RefreshCw,
 } from 'lucide-react'
-import { invoke } from '@tauri-apps/api/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MessageBubble } from './message-bubble'
 import { ToolCallCard } from './tool-call-card'
 import { useBrainStore } from '@/stores/brain-store'
+import { aiChat, type AiChatHistoryMessage } from '@/lib/api/ai'
+import { getErrorMessage } from '@/lib/error-utils'
 import type { ChatMessage, ChatToolCall } from '@/types/ai'
 
 const SUGGESTIONS = [
@@ -41,23 +42,31 @@ function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  const [chatHistory, setChatHistory] = useState<unknown[]>([])
+  const [chatHistory, setChatHistory] = useState<AiChatHistoryMessage[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Brain store for autonomous goal execution
-  const brainStore = useBrainStore()
+  const initBrain = useBrainStore((state) => state.init)
+  const cleanupBrain = useBrainStore((state) => state.cleanup)
+  const brainIsRunning = useBrainStore((state) => state.isRunning)
+  const activeGoalDescription = useBrainStore(
+    (state) => state.activeGoalDescription
+  )
+  const progress = useBrainStore((state) => state.progress)
+  const events = useBrainStore((state) => state.events)
+  const cancelGoal = useBrainStore((state) => state.cancelGoal)
 
   // Init brain event listener
   useEffect(() => {
-    brainStore.init()
-    return () => brainStore.cleanup()
-  }, [])
+    void initBrain()
+    return () => cleanupBrain()
+  }, [cleanupBrain, initBrain])
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages, isTyping, brainStore.events])
+  }, [events, isTyping, messages])
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return
@@ -73,50 +82,34 @@ function ChatPage() {
     setIsTyping(true)
 
     try {
-      // Call the real AI backend
-      const result = await invoke<{
-        response: string
-        messages: unknown[]
-        tool_server_map?: Record<string, string>
-      }>('ai_chat', {
-        message: text.trim(),
-        history: chatHistory.length > 0 ? chatHistory : null,
-      })
+      const result = await aiChat(text.trim(), chatHistory)
 
       const serverMap = result.tool_server_map ?? {}
 
       // Extract tool calls from the message history if present
       const toolCalls: ChatToolCall[] = []
-      if (result.messages) {
-        for (const msg of result.messages as Array<{
-          role: string
-          tool_calls?: Array<{
-            id: string
-            function: { name: string; arguments: string }
-          }>
-          tool_call_id?: string
-          content?: string
-        }>) {
-          if (msg.role === 'assistant' && msg.tool_calls) {
-            for (const tc of msg.tool_calls) {
-              // Use the actual server name from the map; fall back to "MCP"
-              const serverName = serverMap[tc.function.name] ?? 'MCP'
-              toolCalls.push({
-                id: tc.id,
-                tool_name: tc.function.name,
-                server_name: serverName,
-                arguments: JSON.parse(tc.function.arguments || '{}'),
-                is_loading: false,
-                is_error: false,
-              })
-            }
+      for (const msg of result.messages ?? []) {
+        if (msg.role === 'assistant' && msg.tool_calls) {
+          for (const toolCall of msg.tool_calls) {
+            const serverName = serverMap[toolCall.function.name] ?? 'MCP'
+            toolCalls.push({
+              id: toolCall.id,
+              tool_name: toolCall.function.name,
+              server_name: serverName,
+              arguments: JSON.parse(toolCall.function.arguments || '{}') as Record<
+                string,
+                unknown
+              >,
+              is_loading: false,
+              is_error: false,
+            })
           }
-          // Match tool results to tool calls
-          if (msg.role === 'tool' && msg.tool_call_id) {
-            const matching = toolCalls.find((tc) => tc.id === msg.tool_call_id)
-            if (matching) {
-              matching.result = msg.content || ''
-            }
+        }
+
+        if (msg.role === 'tool' && msg.tool_call_id) {
+          const matching = toolCalls.find((toolCall) => toolCall.id === msg.tool_call_id)
+          if (matching) {
+            matching.result = msg.content || ''
           }
         }
       }
@@ -132,13 +125,10 @@ function ChatPage() {
       setMessages((prev) => [...prev, aiMsg])
       setChatHistory(result.messages || [])
     } catch (error) {
-      const errorMsg =
-        error instanceof Error ? error.message : String(error)
-
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: `I encountered an error: ${errorMsg}\n\nPlease check that your AI provider is configured in Settings.`,
+        content: `I encountered an error: ${getErrorMessage(error)}\n\nPlease check that your AI provider is configured in Settings.`,
         timestamp: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, aiMsg])
@@ -159,18 +149,18 @@ function ChatPage() {
       className="flex flex-col h-full"
     >
       {/* Brain Status Bar */}
-      {brainStore.isRunning && (
+      {brainIsRunning && (
         <div className="px-6 py-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--accent))]/30">
           <div className="max-w-2xl mx-auto flex items-center gap-3">
             <Brain className="h-4 w-4 text-[hsl(var(--primary))] animate-pulse" />
             <div className="flex-1">
               <p className="text-xs font-medium text-[hsl(var(--foreground))]">
                 Brain is working
-                {brainStore.activeGoalDescription
-                  ? `: ${brainStore.activeGoalDescription}`
+                {activeGoalDescription
+                  ? `: ${activeGoalDescription}`
                   : '...'}
               </p>
-              {brainStore.progress && (
+              {progress && (
                 <div className="flex items-center gap-2 mt-1">
                   <div className="flex-1 h-1.5 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
                     <motion.div
@@ -178,9 +168,9 @@ function ChatPage() {
                       initial={{ width: 0 }}
                       animate={{
                         width: `${
-                          brainStore.progress.totalSteps > 0
-                            ? (brainStore.progress.completedSteps /
-                                brainStore.progress.totalSteps) *
+                          progress.totalSteps > 0
+                            ? (progress.completedSteps /
+                                progress.totalSteps) *
                               100
                             : 0
                         }%`,
@@ -189,21 +179,21 @@ function ChatPage() {
                     />
                   </div>
                   <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                    {brainStore.progress.completedSteps}/
-                    {brainStore.progress.totalSteps}
+                    {progress.completedSteps}/
+                    {progress.totalSteps}
                   </span>
                 </div>
               )}
-              {brainStore.progress?.currentStep && (
+              {progress?.currentStep && (
                 <p className="text-[10px] text-[hsl(var(--muted-foreground))] mt-0.5 truncate">
-                  {brainStore.progress.currentStep}
+                  {progress.currentStep}
                 </p>
               )}
             </div>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => brainStore.cancelGoal()}
+              onClick={() => void cancelGoal()}
               className="text-xs h-6 px-2"
             >
               Cancel
@@ -214,7 +204,7 @@ function ChatPage() {
 
       {/* Brain Events Feed */}
       <AnimatePresence>
-        {brainStore.events.length > 0 && brainStore.isRunning && (
+        {events.length > 0 && brainIsRunning && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -222,7 +212,7 @@ function ChatPage() {
             className="px-6 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))]/50 overflow-hidden"
           >
             <div className="max-w-2xl mx-auto py-2 space-y-1">
-              {brainStore.events.slice(-5).map((evt, i) => (
+              {events.slice(-5).map((evt, i) => (
                 <div
                   key={i}
                   className="flex items-center gap-2 text-[11px] text-[hsl(var(--muted-foreground))]"

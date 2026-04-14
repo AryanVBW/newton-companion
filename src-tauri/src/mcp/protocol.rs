@@ -85,6 +85,10 @@ pub struct McpInitializeResult {
     pub capabilities: McpCapabilities,
     #[serde(rename = "serverInfo")]
     pub server_info: McpServerInfo,
+    /// Server-provided instructions describing how to use its tools.
+    /// Critical for Newton MCP which provides detailed platform context.
+    #[serde(default)]
+    pub instructions: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -99,7 +99,12 @@ function LectureDetailPanel({ lecture, onClose }: LectureDetailPanelProps) {
           {(lecture.status === 'recording' || lecture.recording_url) && (
             <>
               <Separator className="mb-4" />
-              <Button variant="outline" className="w-full gap-2">
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => lecture.recording_url && window.open(lecture.recording_url, '_blank')}
+                disabled={!lecture.recording_url}
+              >
                 <PlayCircle className="h-4 w-4" />
                 Watch Recording
               </Button>

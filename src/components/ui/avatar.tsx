@@ -13,9 +13,9 @@ function Avatar({ src, alt, fallback, size = 'md', className }: AvatarProps) {
   const [imgError, setImgError] = useState(false)
 
   const sizeClasses = {
-    sm: 'h-8 w-8 text-xs',
-    md: 'h-10 w-10 text-sm',
-    lg: 'h-12 w-12 text-base',
+    sm: 'h-7 w-7 text-[10px]',
+    md: 'h-9 w-9 text-xs',
+    lg: 'h-11 w-11 text-sm',
   }
 
   return (
@@ -35,7 +35,11 @@ function Avatar({ src, alt, fallback, size = 'md', className }: AvatarProps) {
         />
       ) : (
         <div
-          className="flex h-full w-full items-center justify-center bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] font-medium"
+          className="flex h-full w-full items-center justify-center font-semibold tracking-wide"
+          style={{
+            background: 'linear-gradient(135deg, hsl(var(--newton-teal) / 0.8) 0%, hsl(var(--newton-blue) / 0.8) 100%)',
+            color: '#fff',
+          }}
         >
           {fallback.slice(0, 2).toUpperCase()}
         </div>

@@ -14,11 +14,25 @@ interface EmptyStateProps {
 function EmptyState({ icon: Icon, title, description, actionLabel, onAction, className }: EmptyStateProps) {
   return (
     <div className={cn('flex flex-col items-center justify-center py-16 px-4 text-center', className)}>
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--muted))] mb-4">
-        <Icon className="h-8 w-8 text-[hsl(var(--muted-foreground))]" />
+      <div
+        className="flex h-14 w-14 items-center justify-center rounded-2xl mb-4"
+        style={{
+          background: 'hsl(var(--newton-teal) / 0.08)',
+          border: '1px solid hsl(var(--newton-teal) / 0.14)',
+        }}
+      >
+        <Icon
+          className="h-7 w-7"
+          style={{ color: 'hsl(var(--newton-teal))' }}
+        />
       </div>
-      <h3 className="text-lg font-semibold mb-1">{title}</h3>
-      <p className="text-sm text-[hsl(var(--muted-foreground))] max-w-sm mb-4">{description}</p>
+      <h3 className="text-[15px] font-semibold mb-1.5">{title}</h3>
+      <p
+        className="text-[13px] max-w-sm mb-5 leading-relaxed"
+        style={{ color: 'hsl(var(--muted-foreground))' }}
+      >
+        {description}
+      </p>
       {actionLabel && onAction && (
         <Button onClick={onAction} size="sm">
           {actionLabel}

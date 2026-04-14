@@ -1,4 +1,5 @@
 pub mod brain;
+pub mod builtin_tools;
 pub mod coordinator;
 pub mod executor;
 pub mod memory;

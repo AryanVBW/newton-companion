@@ -1,6 +1,7 @@
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/avatar'
 import { Bot } from 'lucide-react'
+import { useNewtonAuthStore } from '@/stores/newton-auth-store'
 import type { ChatMessage } from '@/types/ai'
 
 interface MessageBubbleProps {
@@ -9,11 +10,15 @@ interface MessageBubbleProps {
 
 function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+  const userName = useNewtonAuthStore((s) => s.userName)
+  const initials = userName
+    ? userName.split(' ').slice(0, 2).map((n: string) => n[0]).join('').toUpperCase()
+    : 'ME'
 
   return (
     <div className={cn('flex gap-3', isUser ? 'flex-row-reverse' : 'flex-row')}>
       {isUser ? (
-        <Avatar fallback="VS" size="sm" className="shrink-0 mt-0.5" />
+        <Avatar fallback={initials} size="sm" className="shrink-0 mt-0.5" />
       ) : (
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--muted))] shrink-0 mt-0.5">
           <Bot className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />

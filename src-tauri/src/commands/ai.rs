@@ -21,10 +21,12 @@ pub async fn ai_chat(
 ) -> Result<Value, String> {
     let messages = history.unwrap_or_default();
     let mcp_manager = state.mcp_manager.clone();
+    let google_calendar = state.google_calendar.clone();
+    let db = state.db.clone();
 
     let mut brain = state.agent_brain.lock().await;
     let (response_text, final_messages, tool_server_map) = brain
-        .chat(&message, messages, &mcp_manager)
+        .chat(&message, messages, &mcp_manager, &google_calendar, &db)
         .await
         .map_err(|e| e.to_string())?;
 

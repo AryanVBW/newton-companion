@@ -295,6 +295,7 @@ pub async fn sync_all_newton_data(
         ("get_leaderboard", course_args.clone()),
         ("get_question_of_the_day", course_args.clone()),
         ("get_arena_stats", course_args.clone()),
+        ("get_arena_filters", json!({})),
         (
             "get_calendar",
             if ch.is_empty() {

@@ -18,18 +18,26 @@ function Switch({ checked, onCheckedChange, className, disabled, id }: SwitchPro
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors',
+        'relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer items-center rounded-full transition-all duration-200',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        checked ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--input))]',
+        'disabled:cursor-not-allowed disabled:opacity-40',
         className
       )}
+      style={{
+        background: checked
+          ? 'linear-gradient(135deg, #78C7CE 0%, #7E9ACF 100%)'
+          : 'hsl(var(--input))',
+        boxShadow: checked ? '0 0 10px rgba(120,199,206,0.3)' : 'none',
+      }}
     >
       <span
-        className={cn(
-          'pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform',
-          checked ? 'translate-x-5' : 'translate-x-0'
-        )}
+        className="pointer-events-none block rounded-full bg-white shadow-md ring-0 transition-transform duration-200"
+        style={{
+          width: 16,
+          height: 16,
+          transform: checked ? 'translateX(20px)' : 'translateX(3px)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+        }}
       />
     </button>
   )
